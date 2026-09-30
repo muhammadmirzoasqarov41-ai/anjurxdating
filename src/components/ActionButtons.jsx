@@ -10,7 +10,7 @@ export default function ActionButtons({ onNope, onLike, disabled }) {
     <div className="flex items-center justify-center gap-3">
       <button
         className={base + " w-11 h-11"}
-        title="Rebobinar"
+        title="Orqaga qaytarish"
         disabled
       >
         <RotateCcw className="text-amber-400" size={20} />
@@ -20,7 +20,7 @@ export default function ActionButtons({ onNope, onLike, disabled }) {
         className={base + " w-14 h-14"}
         onClick={onNope}
         disabled={disabled}
-        title="No me gusta"
+        title="Yoqmadi"
       >
         <X className="text-nope" size={28} strokeWidth={3} />
       </button>
@@ -33,12 +33,12 @@ export default function ActionButtons({ onNope, onLike, disabled }) {
         className={base + " w-14 h-14"}
         onClick={onLike}
         disabled={disabled}
-        title="Me gusta"
+        title="Yoqdi"
       >
         <Heart className="text-like" size={28} fill="currentColor" />
       </button>
 
-      <button className={base + " w-11 h-11"} title="Boost" disabled>
+      <button className={base + " w-11 h-11"} title="Tezlashtirish" disabled>
         <Zap className="text-purple-500" size={20} fill="currentColor" />
       </button>
     </div>

@@ -81,7 +81,7 @@ export default function Chat() {
       <div className="flex-1 overflow-y-auto thin-scroll px-4 py-4 space-y-2">
         {messages.length === 0 && (
           <p className="text-center text-sm text-gray-400 mt-6">
-            Hicieron match. Rompe el hielo con un saludo.
+            Match bo'ldingiz. Birinchi bo'lib salom yozing.
           </p>
         )}
         {messages.map((m) => (
@@ -98,7 +98,7 @@ export default function Chat() {
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Escribe un mensaje"
+          placeholder="Xabar yozing..."
           className="flex-1 px-4 py-2.5 rounded-full bg-gray-100 outline-none text-sm focus:ring-1 focus:ring-flame-start"
         />
         <button

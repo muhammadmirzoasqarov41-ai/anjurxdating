@@ -48,17 +48,17 @@ export default function Onboarding() {
       <div className="max-w-md mx-auto">
         <div className="flex items-center gap-2 mb-6">
           <Flame className="text-flame-start" size={26} fill="currentColor" />
-          <h1 className="font-extrabold text-xl">Completa tu perfil</h1>
+          <h1 className="font-extrabold text-xl">Profilingizni to'ldiring</h1>
         </div>
         <p className="text-sm text-gray-500 mb-6">
-          Así te verán las demás personas cuando aparezcas en su pila.
+          Boshqalar sizni o'z lentasida ko'rganlarida shunday ko'rinadi.
         </p>
 
         <div className="rounded-2xl bg-white p-6 shadow-card">
           {/* preview de la foto */}
           <div className="flex flex-col items-center mb-6">
             <div className="w-28 h-28 rounded-full overflow-hidden bg-gray-100 mb-3">
-              <img src={photo} alt="Tu foto" className="w-full h-full object-cover" />
+              <img src={photo} alt="Suratingiz" className="w-full h-full object-cover" />
             </div>
             <div className="flex gap-2">
               {SAMPLE_PHOTOS.map((p) => (
@@ -78,19 +78,19 @@ export default function Onboarding() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Nombre">
+            <Field label="Ism">
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 required
                 className="input"
-                placeholder="¿Cómo te llamas?"
+                placeholder="Ismingiz nima?"
               />
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Edad">
+              <Field label="Yosh">
                 <input
                   type="number"
                   min={18}
@@ -102,18 +102,18 @@ export default function Onboarding() {
                   placeholder="25"
                 />
               </Field>
-              <Field label="Ocupación">
+              <Field label="Kasb / Mashg'ulot">
                 <input
                   type="text"
                   value={job}
                   onChange={(e) => setJob(e.target.value)}
                   className="input"
-                  placeholder="Diseñador"
+                  placeholder="Dizayner"
                 />
               </Field>
             </div>
 
-            <Field label="Foto (URL)">
+            <Field label="Surat (URL)">
               <div className="relative">
                 <Camera
                   size={16}
@@ -129,14 +129,14 @@ export default function Onboarding() {
               </div>
             </Field>
 
-            <Field label="Sobre ti">
+            <Field label="O'zingiz haqingizda">
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
                 maxLength={300}
                 className="input resize-none"
-                placeholder="Cuéntale al mundo algo sobre ti"
+                placeholder="O'zingiz haqingizda biror narsa yozing"
               />
             </Field>
 
@@ -145,7 +145,7 @@ export default function Onboarding() {
               disabled={busy}
               className="w-full py-3 rounded-full flame-bg text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {busy ? "Guardando..." : "Empezar a deslizar"}
+              {busy ? "Saqlanmoqda..." : "Surishni boshlash"}
             </button>
           </form>
         </div>

@@ -13,17 +13,25 @@ import { auth, googleProvider } from "../lib/firebase";
 import { getProfile } from "../lib/firestore";
 
 // paso los codigos crudos de firebase a mensajes que una persona entienda
-function friendlyError(code) {
+function friendlyError(code, message) {
   const map = {
-    "auth/invalid-email": "El correo no es válido.",
-    "auth/user-not-found": "No existe una cuenta con ese correo.",
-    "auth/wrong-password": "Contraseña incorrecta.",
-    "auth/invalid-credential": "Correo o contraseña incorrectos.",
-    "auth/email-already-in-use": "Ya existe una cuenta con ese correo.",
-    "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
-    "auth/popup-closed-by-user": "Cerraste la ventana antes de terminar.",
+    "auth/invalid-email": "Elektron pochta manzili noto'g'ri.",
+    "auth/user-not-found": "Bunday elektron pochtaga ega hisob topilmadi.",
+    "auth/wrong-password": "Parol noto'g'ri.",
+    "auth/invalid-credential": "Elektron pochta yoki parol noto'g'ri.",
+    "auth/email-already-in-use": "Ushbu elektron pochta allaqachon ro'yxatdan o'tgan.",
+    "auth/weak-password": "Parol kamida 6 ta belgidan iborat bo'lishi kerak.",
+    "auth/popup-closed-by-user": "Oyna yakunlanishidan oldin yopildi.",
+    "auth/popup-blocked": "Brauzer avtorizatsiya oynasini (popup) blokladi. Saytni yangi tabda oching yoki popupga ruxsat bering.",
+    "auth/unauthorized-domain": "Ushbu domen Firebase Authorized Domains ro'yxatiga qo'shilmagan.",
+    "auth/operation-not-allowed": "Firebase konsolida ushbu kirish usuli faollashtirilmagan.",
+    "auth/network-request-failed": "Tarmoq xatosi yoki internet ulanishi uzildi.",
+    "auth/too-many-requests": "Juda ko'p urinish bo'ldi. Birozdan so'ng qayta urinib ko'ring.",
+    "auth/cancelled-popup-request": "Oldingi autentifikatsiya oynasi bekor qilindi.",
   };
-  return map[code] || "Algo salió mal, intenta de nuevo.";
+  if (code && map[code]) return map[code];
+  if (code) return `[${code}] ${message || "Xatolik yuz berdi, qaytadan urinib ko'ring."}`;
+  return "Nimadir noto'g'ri ketdi, qaytadan urinib ko'ring.";
 }
 
 export const useAuthStore = create((set, get) => ({
@@ -37,7 +45,10 @@ export const useAuthStore = create((set, get) => ({
     // si venimos de un login por redirect, recogemos el resultado. esto cubre
     // los navegadores que bloquean el popup (movil sobre todo).
     getRedirectResult(auth).catch((err) => {
-      if (err?.code) set({ error: friendlyError(err.code) });
+      console.warn("Firebase getRedirectResult info/error:", err);
+      if (err?.code && err.code !== "auth/null-user") {
+        set({ error: friendlyError(err.code, err.message) });
+      }
     });
 
     onAuthStateChanged(auth, async (user) => {
@@ -68,7 +79,8 @@ export const useAuthStore = create((set, get) => ({
       await signInWithEmailAndPassword(auth, email, password);
       set({ busy: false });
     } catch (err) {
-      set({ busy: false, error: friendlyError(err.code) });
+      console.error("Firebase loginEmail error:", err);
+      set({ busy: false, error: friendlyError(err.code, err.message) });
       throw err;
     }
   },
@@ -80,7 +92,8 @@ export const useAuthStore = create((set, get) => ({
       if (name) await updateProfile(cred.user, { displayName: name });
       set({ busy: false });
     } catch (err) {
-      set({ busy: false, error: friendlyError(err.code) });
+      console.error("Firebase registerEmail error:", err);
+      set({ busy: false, error: friendlyError(err.code, err.message) });
       throw err;
     }
   },
@@ -92,6 +105,7 @@ export const useAuthStore = create((set, get) => ({
       // no apago busy aqui: onAuthStateChanged actualiza el user y la pantalla
       // de login redirige sola. asi no se ve un parpadeo del formulario.
     } catch (err) {
+      console.error("Firebase loginGoogle error:", err);
       // si el navegador bloquea el popup, caemos a redirect (no falla en seco)
       if (
         err?.code === "auth/popup-blocked" ||
@@ -102,11 +116,12 @@ export const useAuthStore = create((set, get) => ({
           await signInWithRedirect(auth, googleProvider);
           return;
         } catch (redirErr) {
-          set({ busy: false, error: friendlyError(redirErr.code) });
+          console.error("Firebase signInWithRedirect error:", redirErr);
+          set({ busy: false, error: friendlyError(redirErr.code, redirErr.message) });
           throw redirErr;
         }
       }
-      set({ busy: false, error: friendlyError(err.code) });
+      set({ busy: false, error: friendlyError(err.code, err.message) });
       throw err;
     }
   },

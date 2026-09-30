@@ -16,7 +16,7 @@ export const useDeckStore = create((set, get) => ({
       set({ cards, index: 0, loading: false });
     } catch (err) {
       console.error(err);
-      set({ loading: false, error: "No pudimos cargar más personas." });
+      set({ loading: false, error: "Boshqa odamlarni yuklab bo'lmadi." });
     }
   },
 

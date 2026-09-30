@@ -59,19 +59,19 @@ export default function Login() {
 
         <div className="rounded-2xl bg-white p-8 shadow-card">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            {mode === "login" ? "Bienvenido de nuevo" : "Crea tu cuenta"}
+            {mode === "login" ? "Xush kelibsiz" : "Hisob yarating"}
           </h1>
           <p className="text-sm text-gray-500 mb-6">
             {mode === "login"
-              ? "Inicia sesión para seguir deslizando"
-              : "Regístrate y empieza a conocer gente"}
+              ? "Surishda davom etish uchun tizimga kiring"
+              : "Ro'yxatdan o'ting va yangi insonlar bilan tanishing"}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === "register" && (
               <input
                 type="text"
-                placeholder="Tu nombre"
+                placeholder="Ismingiz"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -80,7 +80,7 @@ export default function Login() {
             )}
             <input
               type="email"
-              placeholder="Correo electrónico"
+              placeholder="Elektron pochta"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -88,7 +88,7 @@ export default function Login() {
             />
             <input
               type="password"
-              placeholder="Contraseña"
+              placeholder="Parol"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -104,16 +104,16 @@ export default function Login() {
               className="w-full py-3 rounded-full flame-bg text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {busy
-                ? "Cargando..."
+                ? "Yuklanmoqda..."
                 : mode === "login"
-                ? "Iniciar sesión"
-                : "Registrarme"}
+                ? "Kirish"
+                : "Ro'yxatdan o'tish"}
             </button>
           </form>
 
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400">o</span>
+            <span className="text-xs text-gray-400">yoki</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 
@@ -122,23 +122,24 @@ export default function Login() {
             disabled={busy}
             className="w-full py-3 rounded-full border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            <GoogleIcon size={18} /> Continuar con Google
+            <GoogleIcon size={18} /> Google orqali davom etish
           </button>
 
           <p className="text-sm text-center text-gray-500 mt-6">
-            {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
+            {mode === "login" ? "Hisobingiz yo'qmi?" : "Hisobingiz bormi?"}{" "}
             <button
               onClick={switchMode}
               className="text-flame-start font-semibold hover:underline"
             >
-              {mode === "login" ? "Regístrate" : "Inicia sesión"}
+              {mode === "login" ? "Ro'yxatdan o'ting" : "Tizimga kiring"}
             </button>
           </p>
         </div>
 
         <p className="text-center text-xs text-white/80 mt-5 leading-relaxed px-2">
-          Este es un proyecto personal hecho para practicar programación. No está
-          afiliado, asociado ni respaldado por Tinder ni por Match Group.
+          Bu dasturlashni mashq qilish uchun yaratilgan shaxsiy loyiha. U Tinder
+          yoki Match Group bilan aloqador emas, bog'liq emas va ular tomonidan
+          qo'llab-quvvatlanmaydi.
         </p>
       </motion.div>
     </div>

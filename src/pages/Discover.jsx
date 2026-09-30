@@ -33,7 +33,7 @@ export default function Discover() {
         {error && (
           <EmptyState
             icon={Flame}
-            title="Algo falló"
+            title="Xatolik yuz berdi"
             subtitle={error}
           />
         )}
@@ -41,8 +41,8 @@ export default function Discover() {
         {noMore && (
           <EmptyState
             icon={Flame}
-            title="No hay nadie nuevo por aquí"
-            subtitle="Vuelve más tarde, seguro aparece gente nueva."
+            title="Hozircha hech kim yo'q"
+            subtitle="Keyinroq qaytib ko'ring, albatta yangi insonlar paydo bo'ladi."
           />
         )}
 

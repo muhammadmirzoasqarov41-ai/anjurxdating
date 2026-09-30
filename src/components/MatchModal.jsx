@@ -24,9 +24,9 @@ export default function MatchModal({ me, target, onClose }) {
         transition={{ delay: 0.1 }}
         className="flex flex-col items-center"
       >
-        <h1 className="text-4xl font-extrabold italic mb-2">¡Es un match!</h1>
+        <h1 className="text-4xl font-extrabold italic mb-2">Bu match!</h1>
         <p className="text-white/90 mb-10 text-center">
-          A ti y a {target.displayName} se gustaron
+          Siz va {target.displayName} bir-biringizga yoqdingiz
         </p>
 
         <div className="flex items-center -space-x-4 mb-12">
@@ -38,13 +38,13 @@ export default function MatchModal({ me, target, onClose }) {
           onClick={goToChat}
           className="w-full max-w-xs py-3 rounded-full bg-white text-flame-start font-bold mb-3"
         >
-          Enviar un mensaje
+          Xabar yuborish
         </button>
         <button
           onClick={onClose}
           className="w-full max-w-xs py-3 rounded-full border border-white/70 text-white font-semibold"
         >
-          Seguir deslizando
+          Surishda davom etish
         </button>
       </motion.div>
     </motion.div>

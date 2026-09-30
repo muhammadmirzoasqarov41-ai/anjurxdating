@@ -39,15 +39,15 @@ export default function Matches() {
     return (
       <EmptyState
         icon={MessageCircle}
-        title="Aún no tienes matches"
-        subtitle="Cuando tú y otra persona se gusten, aparecerán aquí para chatear."
+        title="Hali matchlaringiz yo'q"
+        subtitle="Siz va boshqa inson bir-biringizga yoqsangiz, suhbatlashish uchun bu yerda paydo bo'ladi."
       />
     );
   }
 
   return (
     <div className="max-w-md mx-auto px-4 py-4">
-      <h1 className="font-extrabold text-lg mb-3">Mensajes</h1>
+      <h1 className="font-extrabold text-lg mb-3">Xabarlar</h1>
       <div className="space-y-1">
         {matches.map((m) => {
           const otherUid = m.users.find((u) => u !== user.uid);
@@ -76,7 +76,7 @@ export default function Matches() {
                   {other.displayName}
                 </p>
                 <p className="text-sm text-gray-500 truncate">
-                  {m.lastMessage || "Hicieron match, salúdense"}
+                  {m.lastMessage || "Match bo'ldingiz, bir-biringizga salom bering"}
                 </p>
               </div>
             </Link>

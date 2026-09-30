@@ -97,7 +97,7 @@ export default function SwipeCard({ profile, onSwipe, isTop }) {
           )}
           {typeof profile.distanceKm === "number" && (
             <p className="flex items-center gap-1.5 text-sm text-white/80 mt-0.5">
-              <MapPin size={14} /> a {profile.distanceKm} km de distancia
+              <MapPin size={14} /> {profile.distanceKm} km uzoqlikda
             </p>
           )}
           {profile.bio && (

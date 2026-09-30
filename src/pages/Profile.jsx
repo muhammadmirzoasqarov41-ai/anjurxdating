@@ -39,8 +39,7 @@ export default function Profile() {
             )}
             {typeof profile?.distanceKm === "number" && (
               <p className="flex items-center gap-2">
-                <MapPin size={16} className="text-gray-400" /> a{" "}
-                {profile.distanceKm} km
+                <MapPin size={16} className="text-gray-400" /> {profile.distanceKm} km uzoqlikda
               </p>
             )}
           </div>
@@ -55,14 +54,15 @@ export default function Profile() {
             onClick={logout}
             className="mt-6 w-full py-3 rounded-full border border-gray-200 text-gray-700 font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
           >
-            <LogOut size={18} /> Cerrar sesión
+            <LogOut size={18} /> Chiqish
           </button>
         </div>
       </div>
 
       <p className="text-center text-xs text-gray-400 mt-5 leading-relaxed px-4">
-        Spark es un proyecto personal creado para practicar programación. No está
-        afiliado, asociado ni respaldado por Tinder ni por Match Group, Inc.
+        Spark — bu dasturlashni mashq qilish uchun yaratilgan shaxsiy loyiha. U
+        Tinder yoki Match Group, Inc. bilan aloqador emas, bog'liq emas va ular
+        tomonidan qo'llab-quvvatlanmaydi.
       </p>
     </div>
   );
