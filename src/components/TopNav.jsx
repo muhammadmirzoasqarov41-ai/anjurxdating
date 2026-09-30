@@ -16,13 +16,13 @@ export default function TopNav() {
         </div>
 
         <nav className="flex items-center gap-1">
-          <NavLink to="/" end className={link}>
+          <NavLink to="/" end className={link} title="Kashf qilish" aria-label="Kashf qilish">
             <Flame size={18} />
           </NavLink>
-          <NavLink to="/matches" className={link}>
+          <NavLink to="/matches" className={link} title="Xabarlar" aria-label="Xabarlar">
             <MessageCircle size={18} />
           </NavLink>
-          <NavLink to="/profile" className={link}>
+          <NavLink to="/profile" className={link} title="Profil" aria-label="Profil">
             <User size={18} />
           </NavLink>
         </nav>

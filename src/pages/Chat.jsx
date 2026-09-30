@@ -62,7 +62,7 @@ export default function Chat() {
     <div className="flex flex-col h-screen bg-white">
       {/* cabecera del chat */}
       <header className="flex items-center gap-3 px-4 h-14 border-b border-gray-100">
-        <button onClick={() => navigate("/matches")} className="text-gray-500">
+        <button onClick={() => navigate("/matches")} className="text-gray-500" title="Orqaga" aria-label="Orqaga">
           <ArrowLeft size={22} />
         </button>
         <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
