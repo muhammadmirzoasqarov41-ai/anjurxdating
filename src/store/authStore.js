@@ -9,8 +9,9 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from "firebase/auth";
-import { auth, googleProvider } from "../lib/firebase";
+import { auth, googleProvider, db } from "../lib/firebase";
 import { getProfile } from "../lib/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 // paso los codigos crudos de firebase a mensajes que una persona entienda
 function friendlyError(code, message) {
@@ -56,6 +57,16 @@ export const useAuthStore = create((set, get) => ({
       if (user) {
         try {
           profile = await getProfile(user.uid);
+          setDoc(
+            doc(db, "users", user.uid),
+            {
+              uid: user.uid,
+              email: user.email || null,
+              displayName: user.displayName || profile?.displayName || null,
+              lastLoginAt: serverTimestamp(),
+            },
+            { merge: true }
+          ).catch(() => {});
         } catch (err) {
           console.error("No se pudo cargar el perfil", err);
         }

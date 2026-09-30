@@ -16,6 +16,12 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Users: owner can read/write their own info, only super admin can read all users
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isSuperAdmin();
+      allow write: if isOwner(userId) || isSuperAdmin();
+    }
+
     // Profiles: users can read profiles for the swipe deck, only owner can edit their own
     match /tinder_profiles/{userId} {
       allow read: if isAuthenticated();
