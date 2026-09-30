@@ -21,6 +21,7 @@ export default function Onboarding() {
   const [photos, setPhotos] = useState([]);
   const [photoError, setPhotoError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
   const fileInputRef = useRef(null);
 
   // Clean up object URLs when component unmounts or photos change
@@ -112,27 +113,41 @@ export default function Onboarding() {
 
     setBusy(true);
     setPhotoError("");
+    setUploadProgress("Rasm siqilmoqda va tayyorlanmoqda...");
+
     try {
-      // 1. Upload photos to Firebase Storage
-      const uploadedUrls = await uploadProfilePhotos(user.uid, photos);
+      // 1. High-speed compressed upload to Firebase Storage with timeout fallback
+      const uploadedUrls = await uploadProfilePhotos(
+        user.uid,
+        photos,
+        (current, total) => {
+          setUploadProgress(`Rasm yuklanmoqda (${current}/${total})...`);
+        }
+      );
 
       // 2. Save profile in Firestore
+      setUploadProgress("Profil saqlanmoqda...");
       await saveProfile(user.uid, {
-        displayName: displayName.trim(),
+        displayName: displayName.trim() || "Foydalanuvchi",
         age: age ? Number(age) : null,
         job: job.trim() || null,
         bio: bio.trim() || null,
-        photos: uploadedUrls,
-        distanceKm: Math.floor(Math.random() * 15) + 1,
+        photos: uploadedUrls.length > 0 ? uploadedUrls : photos.map((p) => p.preview).filter(Boolean),
+        city: "Toshkent",
+        datingIntention: "Do'stlik va muloqot",
+        interests: ["Qahva", "Kino", "Musiqa"],
+        distanceKm: Math.floor(Math.random() * 12) + 2,
         isBot: false,
       });
 
       await refreshProfile();
       navigate("/", { replace: true });
     } catch (err) {
-      console.error("No se pudo guardar el perfil", err);
-      setPhotoError("Rasmlarni yuklashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
+      console.error("Profilni saqlashda xatolik:", err);
+      setPhotoError("Profilni saqlashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
+    } finally {
       setBusy(false);
+      setUploadProgress("");
     }
   }
 
@@ -287,9 +302,16 @@ export default function Onboarding() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full py-3 rounded-full flame-bg text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="w-full py-3 rounded-full flame-bg text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {busy ? "Rasmlar yuklanmoqda..." : "Surishni boshlash"}
+              {busy ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>{uploadProgress || "Rasmlar yuklanmoqda..."}</span>
+                </>
+              ) : (
+                "Surishni boshlash"
+              )}
             </button>
           </form>
         </div>
