@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { BOTS, BOT_REPLIES, isBotUid } from "../data/bots";
+import { filterAndSortDeck } from "./matching";
 
 // helper: id de match deterministico a partir de dos uid ordenados, asi no
 // importa quien dio like primero, siempre apuntamos al mismo documento.
@@ -35,9 +36,9 @@ export async function saveProfile(uid, data) {
   );
 }
 
-// devuelve el deck: bots + perfiles reales de otros usuarios, descartando a los
-// que ya hayas swipeado (en cualquier sentido).
-export async function getDeck(uid) {
+// Smart Matching Discover Deck:
+// Real profiles + seed bots, filtering already swiped, applying user preferences & compatibility sorting
+export async function getDeck(uid, myProfile = {}, filters = {}) {
   const swiped = await getSwipedIds(uid);
 
   // perfiles reales de otra gente
@@ -49,8 +50,10 @@ export async function getDeck(uid) {
   // los bots tambien se filtran si ya los swipeaste
   const bots = BOTS.filter((b) => !swiped.has(b.uid));
 
-  // mezclo bots y reales para que no salgan siempre primero los mismos
-  return shuffle([...bots, ...others]);
+  const allCandidates = [...bots, ...others];
+
+  // Smart Matching engine: applies active filters & sorts by compatibility score
+  return filterAndSortDeck(allCandidates, myProfile, filters);
 }
 
 // ---------- swipes ----------

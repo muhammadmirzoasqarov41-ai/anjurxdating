@@ -1,52 +1,179 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Flame } from "lucide-react";
+import {
+  Flame,
+  SlidersHorizontal,
+  RotateCcw,
+  RefreshCw,
+  Heart,
+  X,
+  Compass,
+} from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useDeckStore } from "../store/deckStore";
 import SwipeCard from "../components/SwipeCard";
 import ActionButtons from "../components/ActionButtons";
 import MatchModal from "../components/MatchModal";
 import EmptyState from "../components/EmptyState";
+import ProfileDetailModal from "../components/ProfileDetailModal";
+import DiscoverFiltersModal from "../components/DiscoverFiltersModal";
 
 export default function Discover() {
   const { user, profile } = useAuthStore();
   const { cards, index, loading, error, lastMatch, load, swipe, clearMatch } =
     useDeckStore();
 
-  useEffect(() => {
-    if (user) load(user.uid);
-  }, [user, load]);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(profile?.preferences || {});
 
-  // me arma el objeto de perfil propio que necesito para crear matches
-  const me = { uid: user.uid, ...profile };
+  // Load deck with user profile for Smart Matching and active filters
+  useEffect(() => {
+    if (user) {
+      load(user.uid, profile || {}, activeFilters);
+    }
+  }, [user, profile, activeFilters, load]);
+
+  const me = useMemo(() => ({ uid: user?.uid, ...profile }), [user, profile]);
 
   const remaining = cards.slice(index);
   const noMore = !loading && remaining.length === 0;
 
+  // Count active non-default filters
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (activeFilters.minAge && activeFilters.minAge !== 18) count++;
+    if (activeFilters.maxAge && activeFilters.maxAge !== 45) count++;
+    if (activeFilters.gender && activeFilters.gender !== "all") count++;
+    if (activeFilters.datingIntention && activeFilters.datingIntention !== "all") count++;
+    if (activeFilters.city && activeFilters.city !== "all") count++;
+    if (activeFilters.interest && activeFilters.interest !== "all") count++;
+    return count;
+  }, [activeFilters]);
+
+  // Apply filters from modal
+  const handleApplyFilters = (newFilters) => {
+    setActiveFilters(newFilters);
+  };
+
+  // Reset filters
+  const handleResetFilters = () => {
+    setActiveFilters({});
+  };
+
   return (
-    <div className="max-w-md mx-auto px-4 py-4">
+    <div className="max-w-md mx-auto px-4 py-3">
+      {/* Top Discover Action Bar */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <div className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1 text-xs font-bold text-gray-800">
+            <Flame size={14} className="text-flame-start" fill="currentColor" /> Smart Discover
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-flame-start font-bold border border-orange-100">
+            2.0
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Refresh deck */}
+          <button
+            onClick={() => user && load(user.uid, profile || {}, activeFilters)}
+            disabled={loading}
+            className="w-8 h-8 rounded-full bg-white hover:bg-gray-100 text-gray-500 shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50"
+            title="Qayta yuklash"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          </button>
+
+          {/* Filter button */}
+          <button
+            onClick={() => setShowFilters(true)}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shadow-2xs ${
+              activeFiltersCount > 0
+                ? "flame-bg text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-100"
+            }`}
+            title="Filtrlar"
+          >
+            <SlidersHorizontal size={13} />
+            <span>Filtrlar</span>
+            {activeFiltersCount > 0 && (
+              <span className="ml-0.5 w-4 h-4 rounded-full bg-white text-flame-start font-bold text-[10px] flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Discover Card Container */}
       <div className="relative w-full" style={{ height: "70vh" }}>
+        {/* Loading Skeleton */}
         {loading && (
-          <div className="absolute inset-0 rounded-2xl bg-gray-100 animate-pulse" />
+          <div className="absolute inset-0 rounded-2xl bg-white shadow-card p-4 overflow-hidden flex flex-col justify-between animate-pulse border border-gray-100">
+            <div className="w-full h-3/4 rounded-xl bg-gray-200/80" />
+            <div className="space-y-2 mt-4">
+              <div className="h-5 bg-gray-200/80 rounded w-1/2" />
+              <div className="h-3 bg-gray-200/80 rounded w-1/3" />
+              <div className="h-3 bg-gray-200/80 rounded w-2/3" />
+            </div>
+          </div>
         )}
 
-        {error && (
-          <EmptyState
-            icon={Flame}
-            title="Xatolik yuz berdi"
-            subtitle={error}
-          />
+        {/* Error State */}
+        {error && !loading && (
+          <div className="absolute inset-0 rounded-2xl bg-white shadow-card p-6 flex flex-col items-center justify-center text-center space-y-3 border border-gray-100">
+            <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
+              <Flame size={28} />
+            </div>
+            <h3 className="font-bold text-gray-900 text-sm">
+              Xatolik yuz berdi
+            </h3>
+            <p className="text-xs text-gray-500 max-w-xs">{error}</p>
+            <button
+              onClick={() => user && load(user.uid, profile || {}, activeFilters)}
+              className="mt-2 px-4 py-2 rounded-full flame-bg text-white text-xs font-bold hover:opacity-90 transition-opacity"
+            >
+              Qayta urinish
+            </button>
+          </div>
         )}
 
-        {noMore && (
-          <EmptyState
-            icon={Flame}
-            title="Hozircha hech kim yo'q"
-            subtitle="Keyinroq qaytib ko'ring, albatta yangi insonlar paydo bo'ladi."
-          />
+        {/* No More Profiles / Empty State */}
+        {noMore && !error && !loading && (
+          <div className="absolute inset-0 rounded-2xl bg-white shadow-card p-6 flex flex-col items-center justify-center text-center space-y-3 border border-gray-100">
+            <div className="w-16 h-16 rounded-full bg-orange-50 text-flame-start flex items-center justify-center">
+              <Flame size={30} fill="currentColor" />
+            </div>
+            <h3 className="font-bold text-gray-900 text-base">
+              Hozircha mos profillar qolmadi
+            </h3>
+            <p className="text-xs text-gray-500 max-w-xs leading-relaxed">
+              {activeFiltersCount > 0
+                ? "Siz o'rnatgan filtrlarga mos barcha profillarni ko'rib chiqdingiz. Filtrlarni kengaytirib ko'ring."
+                : "Hududingizdagi barcha yangi profillarni ko'rdingiz. Keyinroq yana tashrif buyuring."}
+            </p>
+
+            <div className="flex items-center gap-2 pt-2">
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={handleResetFilters}
+                  className="px-4 py-2 rounded-full border border-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                >
+                  <RotateCcw size={13} /> Filtrlarni tozalash
+                </button>
+              )}
+              <button
+                onClick={() => user && load(user.uid, profile || {}, activeFilters)}
+                className="px-4 py-2 rounded-full flame-bg text-white text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5"
+              >
+                <RefreshCw size={13} /> Qayta yuklash
+              </button>
+            </div>
+          </div>
         )}
 
-        {/* solo renderizo las dos primeras cartas para no recargar el DOM */}
+        {/* Swipe Cards: Render top 2 cards */}
         {!loading &&
           remaining
             .slice(0, 2)
@@ -59,12 +186,14 @@ export default function Discover() {
                   profile={card}
                   isTop={isTop}
                   onSwipe={(dir) => swipe(me, dir)}
+                  onOpenDetail={(target) => setSelectedProfile(target)}
                 />
               );
             })}
       </div>
 
-      {!noMore && !error && (
+      {/* Action Buttons (Like / Nope) */}
+      {!noMore && !error && !loading && (
         <div className="mt-5">
           <ActionButtons
             disabled={loading || remaining.length === 0}
@@ -74,6 +203,30 @@ export default function Discover() {
         </div>
       )}
 
+      {/* Profile Detail Modal */}
+      <AnimatePresence>
+        {selectedProfile && (
+          <ProfileDetailModal
+            profile={selectedProfile}
+            onClose={() => setSelectedProfile(null)}
+            onLike={(target) => swipe(me, "like", target)}
+            onNope={(target) => swipe(me, "nope", target)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Discover Filters Modal */}
+      <AnimatePresence>
+        {showFilters && (
+          <DiscoverFiltersModal
+            currentFilters={activeFilters}
+            onClose={() => setShowFilters(false)}
+            onApply={handleApplyFilters}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Match Modal */}
       <AnimatePresence>
         {lastMatch && (
           <MatchModal me={me} target={lastMatch} onClose={clearMatch} />

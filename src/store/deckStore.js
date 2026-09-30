@@ -8,11 +8,12 @@ export const useDeckStore = create((set, get) => ({
   loading: true,
   error: null,
   lastMatch: null, // perfil con el que acabas de hacer match (para el modal)
+  filters: {},
 
-  load: async (uid) => {
-    set({ loading: true, error: null });
+  load: async (uid, myProfile = {}, filters = {}) => {
+    set({ loading: true, error: null, filters });
     try {
-      const cards = await getDeck(uid);
+      const cards = await getDeck(uid, myProfile, filters);
       set({ cards, index: 0, loading: false });
     } catch (err) {
       console.error(err);
@@ -21,13 +22,20 @@ export const useDeckStore = create((set, get) => ({
   },
 
   // dir: "like" | "nope". me es el perfil propio (lo necesito para el match).
-  swipe: async (me, dir) => {
+  swipe: async (me, dir, targetCard = null) => {
     const { cards, index } = get();
-    const card = cards[index];
+    const card = targetCard || cards[index];
     if (!card) return;
 
-    // avanzo de inmediato para que la UI no se sienta trabada
-    set({ index: index + 1 });
+    // if swiping the current top card, advance index
+    if (!targetCard || card.uid === cards[index]?.uid) {
+      set({ index: index + 1 });
+    } else {
+      // if swiped from detail modal for a specific card
+      set({
+        cards: cards.filter((c) => c.uid !== card.uid),
+      });
+    }
 
     try {
       const matched = await recordSwipe(me, card, dir === "like");
