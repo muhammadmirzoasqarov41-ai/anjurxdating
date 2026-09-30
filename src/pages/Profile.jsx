@@ -60,7 +60,7 @@ export default function Profile() {
       </div>
 
       <p className="text-center text-xs text-gray-400 mt-5 leading-relaxed px-4">
-        Spark — bu dasturlashni mashq qilish uchun yaratilgan shaxsiy loyiha. U
+        AnjurXdating — bu dasturlashni mashq qilish uchun yaratilgan shaxsiy loyiha. U
         Tinder yoki Match Group, Inc. bilan aloqador emas, bog'liq emas va ular
         tomonidan qo'llab-quvvatlanmaydi.
       </p>

@@ -54,7 +54,7 @@ export default function Login() {
       >
         <div className="flex items-center justify-center gap-2 mb-8 text-white">
           <Flame size={34} fill="currentColor" />
-          <span className="font-extrabold text-3xl">Spark</span>
+          <span className="font-extrabold text-3xl">AnjurXdating</span>
         </div>
 
         <div className="rounded-2xl bg-white p-8 shadow-card">

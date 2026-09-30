@@ -1,6 +1,6 @@
 <div align="center">
 
-# Spark — Dating App
+# AnjurXdating — Dating App
 
 **A full-stack dating web app** with real swipe-to-match, mutual matching, and live chat — built with React 18 and Firebase.
 
@@ -19,9 +19,9 @@
 
 ## Overview
 
-**Spark** is a fully functional dating app — not a static demo. Registration, swipes, matches, and chat are persisted in the cloud (Cloud Firestore), and real users appear in each other's discovery deck. It's built with **React 18**, **Vite**, **Tailwind CSS**, **Zustand**, **Framer Motion**, and **Firebase** (Authentication + Firestore).
+**AnjurXdating** is a fully functional dating app — not a static demo. Registration, swipes, matches, and chat are persisted in the cloud (Cloud Firestore), and real users appear in each other's discovery deck. It's built with **React 18**, **Vite**, **Tailwind CSS**, **Zustand**, **Framer Motion**, and **Firebase** (Authentication + Firestore).
 
-To keep the experience lively while the user base grows, Spark seeds a few **bot profiles** that match instantly and reply in chat.
+To keep the experience lively while the user base grows, AnjurXdating seeds a few **bot profiles** that match instantly and reply in chat.
 
 > ⚠️ This is an independent portfolio project inspired by swipe-based dating apps. It is **not affiliated with, endorsed by, or connected to** Tinder or Match Group.
 
@@ -145,7 +145,7 @@ src/
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/screenshot.webp" alt="Spark dating app — swipe deck" width="420" />
+  <img src="docs/screenshot.webp" alt="AnjurXdating app — swipe deck" width="420" />
 </p>
 
 <p align="center"><i>Swipe-to-match deck. Try the live app at <a href="https://spark.giovanni-moreno.com">spark.giovanni-moreno.com</a>.</i></p>

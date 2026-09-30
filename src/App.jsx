@@ -23,7 +23,7 @@ export default function App() {
     return (
       <div className="min-h-screen flame-bg flex items-center justify-center">
         <span className="text-white font-extrabold text-2xl animate-pulse">
-          Spark
+          AnjurXdating
         </span>
       </div>
     );

@@ -1,15 +1,14 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Flame, Camera } from "lucide-react";
+import { Flame, Plus, X } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { saveProfile } from "../lib/firestore";
-
-// fotos de ejemplo por si el usuario no quiere pegar una URL propia
-const SAMPLE_PHOTOS = [
-  "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=800&q=80",
-  "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800&q=80",
-  "https://images.unsplash.com/photo-1463453091185-61582044d556?w=800&q=80",
-];
+import {
+  uploadProfilePhotos,
+  validateImageFile,
+  MAX_PHOTO_COUNT,
+  MIN_PHOTO_COUNT,
+} from "../lib/storage";
 
 export default function Onboarding() {
   const { user, refreshProfile } = useAuthStore();
@@ -19,34 +18,128 @@ export default function Onboarding() {
   const [age, setAge] = useState("");
   const [job, setJob] = useState("");
   const [bio, setBio] = useState("");
-  const [photo, setPhoto] = useState(user?.photoURL || SAMPLE_PHOTOS[0]);
+  const [photos, setPhotos] = useState([]);
+  const [photoError, setPhotoError] = useState("");
   const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Clean up object URLs when component unmounts or photos change
+  useEffect(() => {
+    return () => {
+      photos.forEach((p) => {
+        if (p.preview) URL.revokeObjectURL(p.preview);
+      });
+    };
+  }, [photos]);
+
+  function handleFileSelect(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setPhotoError("");
+
+    const availableSlots = MAX_PHOTO_COUNT - photos.length;
+    if (availableSlots <= 0) {
+      setPhotoError("Ko‘pi bilan 6 ta rasm yuklash mumkin.");
+      e.target.value = "";
+      return;
+    }
+
+    let filesToProcess = files;
+    if (files.length > availableSlots) {
+      setPhotoError("Ko‘pi bilan 6 ta rasm yuklash mumkin. Faqat dastlabki rasm(lar) tanlandi.");
+      filesToProcess = files.slice(0, availableSlots);
+    }
+
+    const newItems = [];
+    for (const file of filesToProcess) {
+      const errorMsg = validateImageFile(file);
+      if (errorMsg) {
+        setPhotoError(errorMsg);
+        continue;
+      }
+
+      // Prevent duplicate selection by filename and size
+      const isDuplicate = photos.some(
+        (p) => p.file.name === file.name && p.file.size === file.size
+      );
+      if (isDuplicate) {
+        continue;
+      }
+
+      newItems.push({
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        file,
+        preview: URL.createObjectURL(file),
+      });
+    }
+
+    if (newItems.length > 0) {
+      setPhotos((prev) => [...prev, ...newItems]);
+    }
+
+    // Reset input so user can choose the same file if re-added
+    e.target.value = "";
+  }
+
+  function handleRemovePhoto(indexToRemove) {
+    setPhotos((prev) => {
+      const item = prev[indexToRemove];
+      if (item && item.preview) {
+        URL.revokeObjectURL(item.preview);
+      }
+      const updated = prev.filter((_, idx) => idx !== indexToRemove);
+      if (updated.length === 0) {
+        setPhotoError("Kamida 1 ta rasm yuklang");
+      } else {
+        setPhotoError("");
+      }
+      return updated;
+    });
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
+
+    if (photos.length < MIN_PHOTO_COUNT) {
+      setPhotoError("Kamida 1 ta rasm yuklang");
+      return;
+    }
+    if (photos.length > MAX_PHOTO_COUNT) {
+      setPhotoError("Ko‘pi bilan 6 ta rasm yuklash mumkin.");
+      return;
+    }
+
     setBusy(true);
+    setPhotoError("");
     try {
+      // 1. Upload photos to Firebase Storage
+      const uploadedUrls = await uploadProfilePhotos(user.uid, photos);
+
+      // 2. Save profile in Firestore
       await saveProfile(user.uid, {
         displayName: displayName.trim(),
         age: age ? Number(age) : null,
         job: job.trim() || null,
         bio: bio.trim() || null,
-        photos: [photo],
+        photos: uploadedUrls,
         distanceKm: Math.floor(Math.random() * 15) + 1,
         isBot: false,
       });
+
       await refreshProfile();
       navigate("/", { replace: true });
     } catch (err) {
       console.error("No se pudo guardar el perfil", err);
+      setPhotoError("Rasmlarni yuklashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
       setBusy(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-10">
+    <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-md mx-auto">
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-2">
           <Flame className="text-flame-start" size={26} fill="currentColor" />
           <h1 className="font-extrabold text-xl">Profilingizni to'ldiring</h1>
         </div>
@@ -55,29 +148,96 @@ export default function Onboarding() {
         </p>
 
         <div className="rounded-2xl bg-white p-6 shadow-card">
-          {/* preview de la foto */}
-          <div className="flex flex-col items-center mb-6">
-            <div className="w-28 h-28 rounded-full overflow-hidden bg-gray-100 mb-3">
-              <img src={photo} alt="Suratingiz" className="w-full h-full object-cover" />
-            </div>
-            <div className="flex gap-2">
-              {SAMPLE_PHOTOS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPhoto(p)}
-                  className={
-                    "w-10 h-10 rounded-full overflow-hidden border-2 " +
-                    (photo === p ? "border-flame-start" : "border-transparent")
-                  }
-                >
-                  <img src={p} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Foto yuklash qismi (1-6 ta rasm) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Rasmlar
+                </span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                  {photos.length}/{MAX_PHOTO_COUNT}
+                </span>
+              </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-3 gap-2.5">
+                {Array.from({ length: MAX_PHOTO_COUNT }).map((_, idx) => {
+                  const item = photos[idx];
+                  if (item) {
+                    return (
+                      <div
+                        key={item.id}
+                        className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm"
+                      >
+                        <img
+                          src={item.preview}
+                          alt={`Rasm ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {idx === 0 && (
+                          <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-xs text-[10px] text-white font-medium px-1.5 py-0.5 rounded">
+                            Asosiy
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(idx)}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center transition-colors shadow-sm"
+                          title="Rasmni o‘chirish"
+                          aria-label="Rasmni o‘chirish"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (idx === photos.length) {
+                    return (
+                      <button
+                        key={`add-${idx}`}
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square rounded-xl border-2 border-dashed border-gray-300 hover:border-flame-start bg-gray-50 hover:bg-rose-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-flame-start transition-all cursor-pointer"
+                        title="Rasm qo‘shish"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-white shadow-xs flex items-center justify-center text-flame-start">
+                          <Plus size={18} strokeWidth={2.5} />
+                        </div>
+                        <span className="text-[11px] font-semibold">Rasm qo‘shish</span>
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={`empty-${idx}`}
+                      className="aspect-square rounded-xl border border-gray-200/60 bg-gray-50/60 flex items-center justify-center text-gray-300 text-xs font-medium"
+                    >
+                      {idx + 1}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {photoError ? (
+                <p className="text-nope text-xs font-medium mt-2">{photoError}</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-2">
+                  Kamida 1 ta, ko‘pi bilan 6 ta rasm (JPG, PNG, WEBP, maksimal 10 MB)
+                </p>
+              )}
+            </div>
+
             <Field label="Ism">
               <input
                 type="text"
@@ -113,22 +273,6 @@ export default function Onboarding() {
               </Field>
             </div>
 
-            <Field label="Surat (URL)">
-              <div className="relative">
-                <Camera
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                />
-                <input
-                  type="url"
-                  value={photo}
-                  onChange={(e) => setPhoto(e.target.value)}
-                  className="input pl-9"
-                  placeholder="https://..."
-                />
-              </div>
-            </Field>
-
             <Field label="O'zingiz haqingizda">
               <textarea
                 value={bio}
@@ -145,7 +289,7 @@ export default function Onboarding() {
               disabled={busy}
               className="w-full py-3 rounded-full flame-bg text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {busy ? "Saqlanmoqda..." : "Surishni boshlash"}
+              {busy ? "Rasmlar yuklanmoqda..." : "Surishni boshlash"}
             </button>
           </form>
         </div>

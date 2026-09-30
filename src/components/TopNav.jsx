@@ -12,7 +12,7 @@ export default function TopNav() {
       <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Flame className="text-flame-start" size={26} fill="currentColor" />
-          <span className="font-extrabold text-lg flame-text">Spark</span>
+          <span className="font-extrabold text-lg flame-text">AnjurXdating</span>
         </div>
 
         <nav className="flex items-center gap-1">
