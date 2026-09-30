@@ -532,4 +532,189 @@ export async function updateReportStatus(reportId, newStatus) {
   });
 }
 
+/**
+ * Fetches all matches with full user 1 and user 2 profiles
+ * and computes real-time statistics (total, today, thisWeek, thisMonth).
+ */
+export async function getAdminMatchesData() {
+  const usersMap = new Map();
+  const profilesMap = new Map();
+
+  // 1. Fetch user accounts
+  try {
+    const usersSnap = await getDocs(collection(db, "users"));
+    usersSnap.forEach((d) => {
+      usersMap.set(d.id, d.data());
+    });
+  } catch (err) {
+    console.warn("getAdminMatchesData users warning:", err);
+  }
+
+  // 2. Fetch profiles
+  try {
+    const profilesSnap = await getDocs(collection(db, "tinder_profiles"));
+    profilesSnap.forEach((d) => {
+      profilesMap.set(d.id, d.data());
+    });
+  } catch (err) {
+    console.warn("getAdminMatchesData profiles warning:", err);
+  }
+
+  // 3. Fetch matches
+  const matchesList = [];
+  const stats = {
+    total: 0,
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    withChat: 0,
+  };
+
+  const now = Date.now();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayMs = startOfToday.getTime();
+  const weekMs = now - 7 * 24 * 60 * 60 * 1000;
+  const monthMs = now - 30 * 24 * 60 * 60 * 1000;
+
+  try {
+    const matchesSnap = await getDocs(collection(db, "tinder_matches"));
+    matchesSnap.forEach((d) => {
+      const data = d.data();
+      const matchId = d.id;
+      const userIds = Array.isArray(data.users) ? data.users : [];
+
+      const uid1 = userIds[0] || null;
+      const uid2 = userIds[1] || null;
+
+      const profile1Data = uid1 ? profilesMap.get(uid1) : null;
+      const user1Data = uid1 ? usersMap.get(uid1) : null;
+
+      const profile2Data = uid2 ? profilesMap.get(uid2) : null;
+      const user2Data = uid2 ? usersMap.get(uid2) : null;
+
+      // Extract User 1
+      const user1 = {
+        uid: uid1,
+        displayName:
+          profile1Data?.displayName ||
+          user1Data?.displayName ||
+          data.profiles?.[uid1]?.displayName ||
+          (uid1 ? `User (${uid1.slice(0, 6)})` : "Noma'lum"),
+        username: profile1Data?.username || null,
+        email: user1Data?.email || null,
+        avatar:
+          profile1Data?.photos?.[0] ||
+          data.profiles?.[uid1]?.photo ||
+          null,
+        age: profile1Data?.age ?? null,
+        job: profile1Data?.job || null,
+        bio: profile1Data?.bio || null,
+        distanceKm: profile1Data?.distanceKm ?? null,
+        interests: Array.isArray(profile1Data?.interests)
+          ? profile1Data.interests
+          : [],
+        photos: Array.isArray(profile1Data?.photos)
+          ? profile1Data.photos
+          : [],
+        isBot: Boolean(profile1Data?.isBot || uid1?.startsWith("bot_")),
+      };
+
+      // Extract User 2
+      const user2 = {
+        uid: uid2,
+        displayName:
+          profile2Data?.displayName ||
+          user2Data?.displayName ||
+          data.profiles?.[uid2]?.displayName ||
+          (uid2 ? `User (${uid2.slice(0, 6)})` : "Noma'lum"),
+        username: profile2Data?.username || null,
+        email: user2Data?.email || null,
+        avatar:
+          profile2Data?.photos?.[0] ||
+          data.profiles?.[uid2]?.photo ||
+          null,
+        age: profile2Data?.age ?? null,
+        job: profile2Data?.job || null,
+        bio: profile2Data?.bio || null,
+        distanceKm: profile2Data?.distanceKm ?? null,
+        interests: Array.isArray(profile2Data?.interests)
+          ? profile2Data.interests
+          : [],
+        photos: Array.isArray(profile2Data?.photos)
+          ? profile2Data.photos
+          : [],
+        isBot: Boolean(profile2Data?.isBot || uid2?.startsWith("bot_")),
+      };
+
+      const hasChat = Boolean(data.lastMessage);
+      const isBot = Boolean(data.isBot || user1.isBot || user2.isBot);
+      const status = hasChat ? "active" : "inactive";
+
+      const createdTimeMs =
+        data.createdAt?.toMillis?.() ||
+        (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0) ||
+        0;
+
+      const matchItem = {
+        id: matchId,
+        matchId,
+        users: userIds,
+        user1,
+        user2,
+        isBot,
+        hasChat,
+        lastMessage: data.lastMessage || null,
+        lastMessageAt: data.lastMessageAt || null,
+        createdAt: data.createdAt || null,
+        status,
+      };
+
+      matchesList.push(matchItem);
+
+      // Stats aggregation
+      stats.total++;
+      if (hasChat) stats.withChat++;
+      if (createdTimeMs >= todayMs) stats.today++;
+      if (createdTimeMs >= weekMs) stats.thisWeek++;
+      if (createdTimeMs >= monthMs) stats.thisMonth++;
+    });
+  } catch (err) {
+    console.warn("getAdminMatchesData matches query warning:", err);
+  }
+
+  return { matches: matchesList, stats };
+}
+
+/**
+ * Fetches realtime messages for a specific match from Firestore subcollection
+ */
+export async function getAdminMatchMessages(matchId) {
+  try {
+    const { query, orderBy } = await import("firebase/firestore");
+    const q = query(
+      collection(db, "tinder_matches", matchId, "messages"),
+      orderBy("createdAt", "asc")
+    );
+    const snap = await getDocs(q);
+    const messages = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    }));
+
+    // Record audit action
+    await logAdminAuditAction({
+      action: "INSPECT_MATCH_CHAT",
+      targetUid: matchId,
+      details: { messagesCount: messages.length },
+    });
+
+    return messages;
+  } catch (err) {
+    console.warn("getAdminMatchMessages warning:", err);
+    return [];
+  }
+}
+
+
 

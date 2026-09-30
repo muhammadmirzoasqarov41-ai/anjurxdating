@@ -25,10 +25,12 @@ import {
   getAdminUsersData,
   getAdminProfilesData,
   getAdminReportsData,
+  getAdminMatchesData,
 } from "../lib/admin";
 import AdminUsersView from "../components/admin/AdminUsersView";
 import AdminProfilesView from "../components/admin/AdminProfilesView";
 import AdminReportsView from "../components/admin/AdminReportsView";
+import AdminMatchesView from "../components/admin/AdminMatchesView";
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -203,6 +205,46 @@ export default function Admin() {
     }
   }, [activeTab, reportsLoaded, loadReports]);
 
+  // MATCHES SECTION DATA MANAGEMENT
+  const [matchesList, setMatchesList] = useState([]);
+  const [matchesStats, setMatchesStats] = useState({
+    total: 0,
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    withChat: 0,
+  });
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesLoaded, setMatchesLoaded] = useState(false);
+  const [matchesError, setMatchesError] = useState(null);
+
+  const loadMatches = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setMatchesLoading(true);
+    setMatchesError(null);
+
+    try {
+      const { matches, stats } = await getAdminMatchesData();
+      setMatchesList(matches);
+      setMatchesStats(stats);
+      setMatchesLoaded(true);
+    } catch (err) {
+      console.error("Mosliklarni yuklashda xatolik:", err);
+      setMatchesError(
+        "Mosliklarni yuklashda xatolik yuz berdi. Iltimos qayta urinib ko'ring."
+      );
+    } finally {
+      setMatchesLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "matches" && !matchesLoaded) {
+      loadMatches();
+    }
+  }, [activeTab, matchesLoaded, loadMatches]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -274,6 +316,7 @@ export default function Admin() {
                   if (activeTab === "users") loadUsers(true);
                   else if (activeTab === "profiles") loadProfiles(true);
                   else if (activeTab === "reports") loadReports(true);
+                  else if (activeTab === "matches") loadMatches(true);
                   else loadData(true);
                 }}
                 disabled={
@@ -281,7 +324,8 @@ export default function Admin() {
                   refreshing ||
                   usersLoading ||
                   profilesLoading ||
-                  reportsLoading
+                  reportsLoading ||
+                  matchesLoading
                 }
                 className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
                 title="Ma'lumotlarni yangilash"
@@ -292,7 +336,8 @@ export default function Admin() {
                     refreshing ||
                     usersLoading ||
                     profilesLoading ||
-                    reportsLoading
+                    reportsLoading ||
+                    matchesLoading
                       ? "animate-spin"
                       : ""
                   }
@@ -665,6 +710,14 @@ export default function Admin() {
           loading={reportsLoading}
           error={reportsError}
           onRefresh={() => loadReports(true)}
+        />
+      ) : activeTab === "matches" ? (
+        <AdminMatchesView
+          matches={matchesList}
+          stats={matchesStats}
+          loading={matchesLoading}
+          error={matchesError}
+          onRefresh={() => loadMatches(true)}
         />
       ) : (
         /* Boshqa bo'limlar uchun toza arxitektura kartasi */
