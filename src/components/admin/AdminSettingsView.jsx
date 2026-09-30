@@ -61,202 +61,247 @@ export default function AdminSettingsView() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* 2. BO'LIMLAR - QATORMA-QATOR UZUNASIGA */}
+      <div className="space-y-4">
         {/* A) SUPER ADMIN PROFILI */}
-        <div className="rounded-2xl bg-white shadow-card p-5 border border-gray-100/60 space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
-            <div className="w-8 h-8 rounded-xl bg-rose-50 text-flame-start flex items-center justify-center">
+        <div className="w-full rounded-2xl bg-white shadow-card p-5 border border-gray-100/60 space-y-3">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-gray-100">
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-flame-start flex items-center justify-center flex-shrink-0">
               <User size={16} />
             </div>
             <div>
               <h3 className="font-bold text-sm text-gray-900">
                 Super Admin Profili
               </h3>
-              <p className="text-xs text-gray-400">Boshqaruvchi hisobi ma'lumotlari</p>
+              <p className="text-xs text-gray-400">
+                Boshqaruvchi hisobi ma'lumotlari va tizimdagi oliy darajadagi huquqlari
+              </p>
             </div>
           </div>
 
-          <div className="space-y-2.5 text-xs">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-gray-500">Elektron pochta:</span>
-              <span className="font-bold text-gray-900 font-mono">
+          <div className="divide-y divide-gray-100 text-xs">
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Elektron pochta</span>
+                <p className="text-[11px] text-gray-400">Super Adminning asosiy autentifikatsiya manzili</p>
+              </div>
+              <span className="font-mono font-bold text-gray-900 bg-gray-50 px-3 py-1 rounded-xl border border-gray-200/70 text-right">
                 luxaidevs@gmail.com
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-gray-500">Roli & Huquqlari:</span>
-              <span className="px-2 py-0.5 rounded-full bg-rose-50 text-flame-start font-bold text-[11px]">
-                Super Admin (Cheklovsiz)
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Tizimdagi Roli</span>
+                <p className="text-[11px] text-gray-400">Platforma bo'yicha to'liq boshqaruv darajasi</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-rose-50 text-flame-start font-bold text-[11px] border border-rose-200/60 self-start sm:self-auto">
+                Super Admin (Cheklovsiz huquq)
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-gray-500">Autentifikatsiya holati:</span>
-              <span className="flex items-center gap-1 text-emerald-600 font-bold">
-                <CheckCircle2 size={13} /> Tasdiqlangan
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Autentifikatsiya Holati</span>
+                <p className="text-[11px] text-gray-400">Firebase Auth token va email tekshiruvi</p>
+              </div>
+              <span className="flex items-center gap-1.5 text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-100 self-start sm:self-auto">
+                <CheckCircle2 size={13} /> Tasdiqlangan (Verified)
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-gray-500">Admin Panelga kirish:</span>
-              <span className="text-gray-700 font-medium">
-                AdminRoute + Firestore Security Rules
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Panelga Kirish Himoyasi</span>
+                <p className="text-[11px] text-gray-400">Ikki bosqichli frontend + backend xavfsizlik nazorati</p>
+              </div>
+              <span className="text-gray-700 font-medium bg-gray-50 px-3 py-1 rounded-xl border border-gray-200/70 self-start sm:self-auto">
+                AdminRoute Guard + Firestore Security Rules
               </span>
             </div>
           </div>
         </div>
 
-        {/* B) ILOVA VA TIZIM STATUSI */}
-        <div className="rounded-2xl bg-white shadow-card p-5 border border-gray-100/60 space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+        {/* B) ILOVA VA TIZIM KONFIGURATSIYASI */}
+        <div className="w-full rounded-2xl bg-white shadow-card p-5 border border-gray-100/60 space-y-3">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-gray-100">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
               <Server size={16} />
             </div>
             <div>
               <h3 className="font-bold text-sm text-gray-900">
                 Ilova va Tizim Konfiguratsiyasi
               </h3>
-              <p className="text-xs text-gray-400">Server va arxitektura ko'rsatkichlari</p>
+              <p className="text-xs text-gray-400">
+                Platformaning dasturiy ta'minoti va server arxitekturasi ko'rsatkichlari
+              </p>
             </div>
           </div>
 
-          <div className="space-y-2.5 text-xs">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-gray-500">Ilova nomi:</span>
-              <span className="font-bold text-gray-900">AnjurXdating</span>
+          <div className="divide-y divide-gray-100 text-xs">
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Ilova Nomi</span>
+                <p className="text-[11px] text-gray-400">Tanishuv va muloqot xizmati</p>
+              </div>
+              <span className="font-bold text-gray-900 bg-gray-50 px-3 py-1 rounded-xl border border-gray-200/70">
+                AnjurXdating
+              </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-gray-500">Muhit (Environment):</span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px]">
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Ishlash Muhiti (Environment)</span>
+                <p className="text-[11px] text-gray-400">Joriy runtime va server holati</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200/60 self-start sm:self-auto">
                 Production / Live
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-gray-500">Ma'lumotlar bazasi:</span>
-              <span className="font-medium text-gray-800">
-                Google Firebase Firestore
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Ma'lumotlar Bazasi</span>
+                <p className="text-[11px] text-gray-400">Realtime hujjatlar ombori</p>
+              </div>
+              <span className="font-medium text-gray-800 bg-gray-50 px-3 py-1 rounded-xl border border-gray-200/70">
+                Google Firebase Firestore (Asia-Southeast1)
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-gray-500">Xavfsiz rejim:</span>
-              <span className="flex items-center gap-1 text-emerald-600 font-bold">
-                <ShieldCheck size={13} /> Faol (Destructive harakatlar himoyalangan)
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Xavfsiz Read-Only Rejim</span>
+                <p className="text-[11px] text-gray-400">Tasodifiy bazani o'chirish yoki buzilishlardan himoya</p>
+              </div>
+              <span className="flex items-center gap-1.5 text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-100 self-start sm:self-auto">
+                <ShieldCheck size={13} /> Faol (Destructive amallar cheklangan)
               </span>
             </div>
           </div>
         </div>
 
-        {/* C) XAVFSIZLIK VA RUHSATLAR */}
-        <div className="rounded-2xl bg-white shadow-card p-5 border border-gray-100/60 space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        {/* C) XAVFSIZLIK VA KIRISH QOIDALARI */}
+        <div className="w-full rounded-2xl bg-white shadow-card p-5 border border-gray-100/60 space-y-3">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-gray-100">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
               <Shield size={16} />
             </div>
             <div>
               <h3 className="font-bold text-sm text-gray-900">
                 Xavfsizlik & Kirish Qoidalari
               </h3>
-              <p className="text-xs text-gray-400">Security Rules va himoya darajalari</p>
+              <p className="text-xs text-gray-400">
+                Firestore Security Rules va backend himoya protokollari
+              </p>
             </div>
           </div>
 
-          <div className="space-y-2.5 text-xs text-gray-700">
-            <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100 flex items-start gap-2.5">
-              <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-gray-900">
-                  Firestore Security Rules faol
-                </p>
-                <p className="text-[11px] text-gray-600 mt-0.5">
-                  Barcha maxfiy admin kolleksiyalari (`reports`, `admin_logs`) faqat `luxaidevs@gmail.com` uchun ochiq.
-                </p>
+          <div className="divide-y divide-gray-100 text-xs">
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Firestore Security Rules</span>
+                <p className="text-[11px] text-gray-400">Maxfiy kolleksiyalar (`reports`, `admin_logs`) faqat Super Admin uchun ochiq</p>
               </div>
+              <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200/60 self-start sm:self-auto">
+                Himoyalangan
+              </span>
             </div>
 
-            <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100 flex items-start gap-2.5">
-              <Lock size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-gray-900">
-                  Case-Insensitive Email Verification
-                </p>
-                <p className="text-[11px] text-gray-600 mt-0.5">
-                  Regex orqali kichik va katta harflardagi loginlar xavfsiz filtrlanadi.
-                </p>
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Case-Insensitive Email Tekshiruvi</span>
+                <p className="text-[11px] text-gray-400">Regex qoidasi orqali katta/kichik harflardagi xatoliklar bartaraf etilgan</p>
               </div>
+              <span className="px-3 py-1 rounded-xl bg-blue-50 text-blue-700 font-bold text-[11px] border border-blue-200/60 self-start sm:self-auto">
+                Regex Faol
+              </span>
             </div>
 
-            <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-2.5">
-              <Activity size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-gray-900">
-                  Avtomatik Audit Qaydnomasi
-                </p>
-                <p className="text-[11px] text-gray-600 mt-0.5">
-                  Har bir admin harakati (prevyu ochish, status o'zgartirish) xavfsizlik jurnaliga yoziladi.
-                </p>
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Avtomatik Audit Jurnali</span>
+                <p className="text-[11px] text-gray-400">Har bir harakat `admin_logs` bazasiga vaqt va parametrlar bilan yoziladi</p>
               </div>
+              <span className="px-3 py-1 rounded-xl bg-gray-100 text-gray-700 font-bold text-[11px] self-start sm:self-auto">
+                Avto-Audit Faol
+              </span>
             </div>
           </div>
         </div>
 
-        {/* D) MODERATSIYA PARAMETRLARI */}
-        <div className="rounded-2xl bg-white shadow-card p-5 border border-gray-100/60 space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+        {/* D) MODERATSIYA ARXITEKTURASI */}
+        <div className="w-full rounded-2xl bg-white shadow-card p-5 border border-gray-100/60 space-y-3">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-gray-100">
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
               <Sliders size={16} />
             </div>
             <div>
               <h3 className="font-bold text-sm text-gray-900">
-                Moderatsiya Arxitekturasi
+                Moderatsiya Arxitekturasi va Standartlari
               </h3>
-              <p className="text-xs text-gray-400">Ish oqimlari va kategoriyalar</p>
+              <p className="text-xs text-gray-400">
+                Shikoyat kategoriyalari, ustuvorliklar va holatlar boshqaruvi
+              </p>
             </div>
           </div>
 
-          <div className="space-y-2 text-xs">
-            <span className="font-bold text-gray-500 uppercase tracking-wider text-[10px] block">
-              Shikoyat kategoriyalari:
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                "fake_profile",
-                "harassment",
-                "spam",
-                "inappropriate_content",
-                "scam",
-                "other",
-              ].map((c) => (
-                <span
-                  key={c}
-                  className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 font-mono font-medium text-[11px]"
-                >
-                  {c}
-                </span>
-              ))}
+          <div className="divide-y divide-gray-100 text-xs">
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Shikoyat Kategoriyalari</span>
+                <p className="text-[11px] text-gray-400">Platformadagi barcha qoidabuzarlik turlari</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 self-start sm:self-auto">
+                {[
+                  "fake_profile",
+                  "harassment",
+                  "spam",
+                  "inappropriate_content",
+                  "scam",
+                  "other",
+                ].map((c) => (
+                  <span
+                    key={c}
+                    className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-700 font-mono text-[11px] border border-gray-200/50"
+                  >
+                    {c}
+                  </span>
+                ))}
+              </div>
             </div>
 
-            <span className="font-bold text-gray-500 uppercase tracking-wider text-[10px] block pt-2">
-              Holat zanjiri (Status flow):
-            </span>
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-700 flex-wrap">
-              <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700">
-                pending
-              </span>
-              <span>→</span>
-              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700">
-                reviewing
-              </span>
-              <span>→</span>
-              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">
-                resolved
-              </span>
-              <span>/</span>
-              <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                dismissed
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Holatlar Zanjiri (Workflow)</span>
+                <p className="text-[11px] text-gray-400">Moderatsiyaning bosqichma-bosqich o'tish tartibi</p>
+              </div>
+              <div className="flex items-center gap-1.5 font-semibold text-[11px] flex-wrap self-start sm:self-auto">
+                <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                  pending
+                </span>
+                <span className="text-gray-400">→</span>
+                <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                  reviewing
+                </span>
+                <span className="text-gray-400">→</span>
+                <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  resolved
+                </span>
+                <span className="text-gray-400">/</span>
+                <span className="px-2.5 py-0.5 rounded-md bg-gray-100 text-gray-700 border border-gray-200">
+                  dismissed
+                </span>
+              </div>
+            </div>
+
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="min-w-0">
+                <span className="font-semibold text-gray-800">Qaror Qabul Qilish Amallari</span>
+                <p className="text-[11px] text-gray-400">Super Admin tomonidan tasdiqlanadigan moderatsiya harakatlari</p>
+              </div>
+              <span className="text-gray-700 font-medium bg-gray-50 px-3 py-1 rounded-xl border border-gray-200/70 self-start sm:self-auto">
+                Jarayonga olish, Hal qilindi, Rad etish, Qayta kutilmoqda qilish
               </span>
             </div>
           </div>
