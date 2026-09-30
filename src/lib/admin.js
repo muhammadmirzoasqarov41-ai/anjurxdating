@@ -1026,6 +1026,408 @@ export async function getAdminAuditLogs() {
   }
 }
 
+/**
+ * -------------------------------------------------------------
+ * MULTIPLE ROLE / MULTIPLE PERMISSION ADMIN MANAGEMENT
+ * -------------------------------------------------------------
+ */
+
+export const ADMIN_ROLES = [
+  {
+    id: "dashboard_manager",
+    label: "Dashboard Manager",
+    section: "dashboard",
+    description: "Umumiy ko'rsatkichlar va asosiy metrikalarni ko'rish",
+    permissions: ["dashboard:view"],
+  },
+  {
+    id: "users_manager",
+    label: "Users Manager",
+    section: "users",
+    description: "Foydalanuvchilar ro'yxati va anketalarini ko'rish",
+    permissions: ["users:view", "users:detail"],
+  },
+  {
+    id: "profiles_manager",
+    label: "Profiles Manager",
+    section: "profiles",
+    description: "Tinder profillari, fotosuratlari va qidiruv anketalarini ko'rish",
+    permissions: ["profiles:view", "profiles:detail"],
+  },
+  {
+    id: "reports_manager",
+    label: "Reports Manager",
+    section: "reports",
+    description: "Shikoyatlarni ko'rish, tekshirish va moderatsiya qilish",
+    permissions: ["reports:view", "reports:review", "reports:resolve"],
+  },
+  {
+    id: "matches_manager",
+    label: "Matches Manager",
+    section: "matches",
+    description: "O'zaro mosliklar (matches) va juftliklarni ko'rish",
+    permissions: ["matches:view", "matches:detail"],
+  },
+  {
+    id: "chat_manager",
+    label: "Chat Manager",
+    section: "chats",
+    description: "Suhbat kanallari va xabarlar tarixini nazorat qilish",
+    permissions: ["chats:view", "chats:messages"],
+  },
+  {
+    id: "moderator",
+    label: "Moderator",
+    section: "moderation",
+    description: "Markaziy moderatsiya navbati va qoidabuzarliklarni ko'rib chiqish",
+    permissions: ["moderation:view", "moderation:review", "moderation:resolve"],
+  },
+  {
+    id: "statistics_manager",
+    label: "Statistics Manager",
+    section: "statistics",
+    description: "To'liq analitika, grafiklar va dinamikani ko'rish",
+    permissions: ["statistics:view", "statistics:analytics"],
+  },
+  {
+    id: "settings_manager",
+    label: "Settings Manager",
+    section: "settings",
+    description: "Tizim sozlamalari va ma'lumotlarini ko'rish (Admin Management bundan mustasno)",
+    permissions: ["settings:view"],
+  },
+];
+
+export function getSectionsForRoles(roleIds = []) {
+  const sections = new Set();
+  ADMIN_ROLES.forEach((r) => {
+    if (roleIds.includes(r.id)) {
+      sections.add(r.section);
+    }
+  });
+  return Array.from(sections);
+}
+
+export function getPermissionsForRoles(roleIds = [], extraPermissions = []) {
+  const perms = new Set(extraPermissions);
+  ADMIN_ROLES.forEach((r) => {
+    if (roleIds.includes(r.id)) {
+      r.permissions.forEach((p) => perms.add(p));
+    }
+  });
+  return Array.from(perms);
+}
+
+/**
+ * Checks current user's privileges:
+ * - Super Admin (luxaidevs@gmail.com): Unrestricted access to all sections + Admin Management
+ * - Appointed Admin (in admins collection): Only assigned sections & permissions
+ */
+export async function getAdminPrivileges(user) {
+  if (!user || !user.email) {
+    return {
+      isAuthorized: false,
+      isSuperAdmin: false,
+      status: "anonymous",
+      sections: [],
+      roles: [],
+      permissions: [],
+    };
+  }
+
+  const emailLower = user.email.toLowerCase().trim();
+
+  // 1. Ultimate Super Admin
+  if (emailLower === "luxaidevs@gmail.com") {
+    return {
+      isAuthorized: true,
+      isSuperAdmin: true,
+      status: "active",
+      name: user.displayName || "Super Admin",
+      email: emailLower,
+      roles: ADMIN_ROLES.map((r) => r.id),
+      sections: [
+        "dashboard",
+        "users",
+        "profiles",
+        "reports",
+        "matches",
+        "chats",
+        "moderation",
+        "statistics",
+        "settings",
+      ],
+      permissions: ["*"],
+    };
+  }
+
+  // 2. Query appointed admin document in `admins/{emailLower}`
+  try {
+    const { doc, getDoc, serverTimestamp, setDoc } = await import("firebase/firestore");
+    const adminDocRef = doc(db, "admins", emailLower);
+    const snap = await getDoc(adminDocRef);
+
+    if (!snap.exists()) {
+      return {
+        isAuthorized: false,
+        isSuperAdmin: false,
+        status: "not_found",
+        reason: "Sizga Admin Panel uchun ruxsat berilmagan.",
+        sections: [],
+        roles: [],
+        permissions: [],
+      };
+    }
+
+    const data = snap.data();
+
+    // Check status
+    if (data.status === "suspended") {
+      return {
+        isAuthorized: false,
+        isSuperAdmin: false,
+        status: "suspended",
+        reason: "Admin hisobingiz Super Admin tomonidan to'xtatilgan.",
+        sections: [],
+        roles: [],
+        permissions: [],
+      };
+    }
+
+    // Check expiration
+    if (data.expiresAt) {
+      const expDate = data.expiresAt.toMillis
+        ? data.expiresAt.toMillis()
+        : new Date(data.expiresAt).getTime();
+      if (expDate && expDate < Date.now()) {
+        return {
+          isAuthorized: false,
+          isSuperAdmin: false,
+          status: "expired",
+          reason: "Adminlik muddatingiz tugagan. Super Admin bilan bog'laning.",
+          sections: [],
+          roles: [],
+          permissions: [],
+        };
+      }
+    }
+
+    const roles = Array.isArray(data.roles) ? data.roles : [];
+    const sections = getSectionsForRoles(roles);
+    const permissions = getPermissionsForRoles(roles, data.permissions || []);
+
+    // Update last login timestamp quietly
+    try {
+      await setDoc(adminDocRef, { lastLogin: serverTimestamp() }, { merge: true });
+    } catch {
+      // ignore
+    }
+
+    return {
+      isAuthorized: sections.length > 0,
+      isSuperAdmin: false,
+      status: "active",
+      name: data.name || user.displayName || "Admin",
+      email: emailLower,
+      roles,
+      sections,
+      permissions,
+      adminData: data,
+    };
+  } catch (err) {
+    console.warn("getAdminPrivileges error:", err);
+    return {
+      isAuthorized: false,
+      isSuperAdmin: false,
+      status: "error",
+      reason: "Ruxsatlarni tekshirishda xatolik yuz berdi.",
+      sections: [],
+      roles: [],
+      permissions: [],
+    };
+  }
+}
+
+/**
+ * Fetches all appointed admins for Super Admin management
+ */
+export async function getAppointedAdminsList() {
+  try {
+    const snap = await getDocs(collection(db, "admins"));
+    const admins = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    }));
+
+    admins.sort((a, b) => {
+      const timeA =
+        a.createdAt?.toMillis?.() ||
+        (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0) ||
+        0;
+      const timeB =
+        b.createdAt?.toMillis?.() ||
+        (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0) ||
+        0;
+      return timeB - timeA;
+    });
+
+    return admins;
+  } catch (err) {
+    console.warn("getAppointedAdminsList warning:", err);
+    return [];
+  }
+}
+
+/**
+ * Creates or updates an appointed admin with multiple roles
+ */
+export async function saveAppointedAdmin({
+  name,
+  email,
+  roles = [],
+  permissions = [],
+  status = "active",
+  expiresAt = null,
+}) {
+  const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
+  const emailLower = (email || "").trim().toLowerCase();
+
+  if (!emailLower || !emailLower.includes("@")) {
+    throw new Error("Yaroqli elektron pochta kiriting");
+  }
+
+  if (emailLower === "luxaidevs@gmail.com") {
+    throw new Error("Super Adminni tahrirlash mumkin emas");
+  }
+
+  const sections = getSectionsForRoles(roles);
+  const allPermissions = getPermissionsForRoles(roles, permissions);
+
+  const adminDocRef = doc(db, "admins", emailLower);
+  const payload = {
+    name: name?.trim() || emailLower.split("@")[0],
+    email: emailLower,
+    roles,
+    sections,
+    permissions: allPermissions,
+    status: status === "suspended" ? "suspended" : "active",
+    expiresAt: expiresAt ? new Date(expiresAt) : null,
+    updatedAt: serverTimestamp(),
+    updatedBy: "luxaidevs@gmail.com",
+  };
+
+  await setDoc(
+    adminDocRef,
+    {
+      ...payload,
+      createdAt: serverTimestamp(),
+      createdBy: "luxaidevs@gmail.com",
+    },
+    { merge: true }
+  );
+
+  await logAdminAuditAction({
+    action: "SAVE_APPOINTED_ADMIN",
+    targetEmail: emailLower,
+    details: { roles, sections, status, expiresAt },
+  });
+
+  return { email: emailLower, ...payload };
+}
+
+/**
+ * Toggles an admin's status between active and suspended
+ */
+export async function toggleAdminStatus(email, currentStatus) {
+  const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
+  const emailLower = (email || "").trim().toLowerCase();
+
+  if (emailLower === "luxaidevs@gmail.com") {
+    throw new Error("Super Admin statusini o'zgartirib bo'lmaydi");
+  }
+
+  const newStatus = currentStatus === "active" ? "suspended" : "active";
+  const adminDocRef = doc(db, "admins", emailLower);
+  await setDoc(
+    adminDocRef,
+    {
+      status: newStatus,
+      updatedAt: serverTimestamp(),
+      updatedBy: "luxaidevs@gmail.com",
+    },
+    { merge: true }
+  );
+
+  await logAdminAuditAction({
+    action: "TOGGLE_ADMIN_STATUS",
+    targetEmail: emailLower,
+    details: { oldStatus: currentStatus, newStatus },
+  });
+
+  return newStatus;
+}
+
+/**
+ * Removes an appointed admin
+ */
+export async function deleteAppointedAdmin(email) {
+  const { doc, deleteDoc } = await import("firebase/firestore");
+  const emailLower = (email || "").trim().toLowerCase();
+
+  if (emailLower === "luxaidevs@gmail.com") {
+    throw new Error("Super Adminni o'chirib bo'lmaydi");
+  }
+
+  const adminDocRef = doc(db, "admins", emailLower);
+  await deleteDoc(adminDocRef);
+
+  await logAdminAuditAction({
+    action: "DELETE_APPOINTED_ADMIN",
+    targetEmail: emailLower,
+  });
+
+  return true;
+}
+
+/**
+ * Fetches recent activity for a specific admin from `admin_logs`
+ */
+export async function getAdminIndividualActivity(adminEmail) {
+  try {
+    const emailLower = (adminEmail || "").trim().toLowerCase();
+    const logsSnap = await getDocs(collection(db, "admin_logs"));
+    const logs = [];
+
+    logsSnap.forEach((d) => {
+      const data = d.data();
+      if (
+        (data.adminEmail || "").toLowerCase() === emailLower ||
+        (data.targetEmail || "").toLowerCase() === emailLower
+      ) {
+        logs.push({ id: d.id, ...data });
+      }
+    });
+
+    logs.sort((a, b) => {
+      const timeA =
+        a.createdAt?.toMillis?.() ||
+        (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0) ||
+        0;
+      const timeB =
+        b.createdAt?.toMillis?.() ||
+        (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0) ||
+        0;
+      return timeB - timeA;
+    });
+
+    return logs.slice(0, 20);
+  } catch (err) {
+    console.warn("getAdminIndividualActivity warning:", err);
+    return [];
+  }
+}
+
+
 
 
 

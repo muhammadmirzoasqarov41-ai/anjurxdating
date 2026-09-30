@@ -12,13 +12,31 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
+    function isAppointedAdmin() {
+      return isAuthenticated()
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()))
+        && get(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())).data.status == "active";
+    }
+
+    function isAdminOrSuperAdmin() {
+      return isSuperAdmin() || isAppointedAdmin();
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Users: owner can read/write their own info, only super admin can read all users
+    // Admins management: only super admin can create/edit/delete admins
+    // Appointed admin can read their own record to verify permissions
+    match /admins/{adminEmail} {
+      allow read: if isSuperAdmin() || (isAuthenticated() && request.auth.token.email != null && request.auth.token.email.lower() == adminEmail.lower());
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // Users: owner can read/write their own info, admins can read all users
     match /users/{userId} {
-      allow read: if isOwner(userId) || isSuperAdmin();
+      allow read: if isOwner(userId) || isAdminOrSuperAdmin();
       allow write: if isOwner(userId) || isSuperAdmin();
     }
 
@@ -35,26 +53,28 @@ service cloud.firestore {
 
     // Matches and realtime chat messages
     match /tinder_matches/{matchId} {
-      allow read: if (isAuthenticated() && request.auth.uid in resource.data.users) || isSuperAdmin();
-      allow create: if isAuthenticated() || isSuperAdmin();
-      allow update: if (isAuthenticated() && request.auth.uid in resource.data.users) || isSuperAdmin();
+      allow read: if (isAuthenticated() && request.auth.uid in resource.data.users) || isAdminOrSuperAdmin();
+      allow create: if isAuthenticated() || isAdminOrSuperAdmin();
+      allow update: if (isAuthenticated() && request.auth.uid in resource.data.users) || isAdminOrSuperAdmin();
       allow delete: if isSuperAdmin();
 
       match /messages/{messageId} {
-        allow read, create: if isAuthenticated() || isSuperAdmin();
+        allow read, create: if isAuthenticated() || isAdminOrSuperAdmin();
         allow update, delete: if isSuperAdmin();
       }
     }
 
-    // Reports: normal users can submit reports, only super admin can read/moderate
+    // Reports: normal users can submit reports, admins can read/moderate
     match /reports/{reportId} {
       allow create: if isAuthenticated();
-      allow read, update, delete: if isSuperAdmin();
+      allow read, update: if isAdminOrSuperAdmin();
+      allow delete: if isSuperAdmin();
     }
 
-    // Admin audit logs: only super admin can read or write
+    // Admin audit logs: admins can read and log actions, only super admin can delete
     match /admin_logs/{logId} {
-      allow read, write: if isSuperAdmin();
+      allow read, create: if isAdminOrSuperAdmin();
+      allow update, delete: if isSuperAdmin();
     }
 
     // Catch-all administrative fallback

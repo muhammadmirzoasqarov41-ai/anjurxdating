@@ -18,6 +18,7 @@ import {
   MapPin,
   Mail,
   CheckCircle2,
+  Shield,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import {
@@ -28,6 +29,8 @@ import {
   getAdminMatchesData,
   getAdminChatsData,
   getAdminModerationData,
+  getAdminPrivileges,
+  ADMIN_ROLES,
 } from "../lib/admin";
 import AdminUsersView from "../components/admin/AdminUsersView";
 import AdminProfilesView from "../components/admin/AdminProfilesView";
@@ -86,8 +89,36 @@ export function formatTime(timestamp) {
 export default function Admin() {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [adminPrivileges, setAdminPrivileges] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Load privileges for current user
+  useEffect(() => {
+    async function loadPrivs() {
+      if (!user) return;
+      const privs = await getAdminPrivileges(user);
+      setAdminPrivileges(privs);
+    }
+    loadPrivs();
+  }, [user]);
+
+  const isSuperAdmin =
+    adminPrivileges?.isSuperAdmin ||
+    user?.email?.toLowerCase() === "luxaidevs@gmail.com";
+
+  // Filter sections according to assigned multiple roles
+  const permittedSections = isSuperAdmin
+    ? SECTIONS
+    : SECTIONS.filter((s) => adminPrivileges?.sections?.includes(s.id));
+
+  // Automatically switch tab if activeTab is not permitted
+  useEffect(() => {
+    if (permittedSections.length > 0 && !permittedSections.some((s) => s.id === activeTab)) {
+      setActiveTab(permittedSections[0].id);
+    }
+  }, [permittedSections, activeTab]);
+
   const [dashboardData, setDashboardData] = useState({
     stats: {
       totalUsers: 0,
@@ -437,9 +468,18 @@ export default function Admin() {
                 />
               </button>
 
-              <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-xs flex items-center gap-1.5 shadow-xs">
-                <ShieldCheck size={15} /> Super Admin
-              </span>
+              {isSuperAdmin ? (
+                <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-xs flex items-center gap-1.5 shadow-xs">
+                  <ShieldCheck size={15} /> Super Admin
+                </span>
+              ) : (
+                <span
+                  className="text-xs font-bold px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-xs flex items-center gap-1.5 shadow-xs"
+                  title={(adminPrivileges?.roles || []).join(", ")}
+                >
+                  <Shield size={14} /> Admin ({adminPrivileges?.roles?.length || 1} vazifa)
+                </span>
+              )}
             </div>
           </div>
 
@@ -453,9 +493,9 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* 9 ta bo'lim navigatsiyasi */}
+        {/* Dinamik bo'limlar navigatsiyasi (faqat ruxsat berilgan bo'limlar) */}
         <div className="p-2 border-b border-gray-100 overflow-x-auto thin-scroll flex items-center gap-1.5 bg-white">
-          {SECTIONS.map((sec) => {
+          {permittedSections.map((sec) => {
             const TabIcon = sec.icon;
             const isActive = activeTab === sec.id;
             return (
@@ -477,8 +517,20 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* DASHBOARD ASOSIY QISMI */}
-      {activeTab === "dashboard" ? (
+      {/* RUXSAT TEKSHIRUVI VA BO'LIMLARNI CHIQARISH */}
+      {!isSuperAdmin && !permittedSections.some((s) => s.id === activeTab) ? (
+        <div className="rounded-2xl bg-white shadow-card p-8 border border-gray-100 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
+            <ShieldAlert size={24} />
+          </div>
+          <h3 className="text-base font-bold text-gray-900">
+            Ushbu Bo'limga Kirish Cheklangan (Access Denied)
+          </h3>
+          <p className="text-xs text-gray-500 max-w-sm mx-auto">
+            Sizning hisobingizga ushbu bo'lim uchun vazifa/ruxsat biriktirilmagan. Iltimos, o'zingizga ajratilgan bo'limlardan foydalaning.
+          </p>
+        </div>
+      ) : activeTab === "dashboard" ? (
         <div className="space-y-5">
           {/* Asosiy Statistika Metriklari */}
           <div>
