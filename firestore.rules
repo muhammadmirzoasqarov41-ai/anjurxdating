@@ -52,6 +52,11 @@ service cloud.firestore {
       allow read, update, delete: if isSuperAdmin();
     }
 
+    // Admin audit logs: only super admin can read or write
+    match /admin_logs/{logId} {
+      allow read, write: if isSuperAdmin();
+    }
+
     // Catch-all administrative fallback
     match /{document=**} {
       allow read, write: if isSuperAdmin();

@@ -20,7 +20,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
-import { getAdminDashboardData } from "../lib/admin";
+import { getAdminDashboardData, getAdminUsersData } from "../lib/admin";
+import AdminUsersView from "../components/admin/AdminUsersView";
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,7 +35,7 @@ const SECTIONS = [
   { id: "settings", label: "Sozlamalar", icon: Settings },
 ];
 
-function formatTime(timestamp) {
+export function formatTime(timestamp) {
   if (!timestamp) return "Noma'lum";
   let date;
   if (typeof timestamp.toMillis === "function") {
@@ -100,6 +101,33 @@ export default function Admin() {
       setRefreshing(false);
     }
   }, []);
+
+  // USERS SECTION DATA MANAGEMENT
+  const [usersList, setUsersList] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+
+  const loadUsers = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setUsersLoading(true);
+
+    try {
+      const data = await getAdminUsersData();
+      setUsersList(data);
+      setUsersLoaded(true);
+    } catch (err) {
+      console.error("Foydalanuvchilarni yuklashda xatolik:", err);
+    } finally {
+      setUsersLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "users" && !usersLoaded) {
+      loadUsers();
+    }
+  }, [activeTab, usersLoaded, loadUsers]);
 
   useEffect(() => {
     loadData();
@@ -168,14 +196,17 @@ export default function Admin() {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => loadData(true)}
-                disabled={loading || refreshing}
+                onClick={() => {
+                  if (activeTab === "users") loadUsers(true);
+                  else loadData(true);
+                }}
+                disabled={loading || refreshing || usersLoading}
                 className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
                 title="Ma'lumotlarni yangilash"
               >
                 <RefreshCw
                   size={16}
-                  className={refreshing ? "animate-spin" : ""}
+                  className={refreshing || usersLoading ? "animate-spin" : ""}
                 />
               </button>
 
@@ -526,6 +557,12 @@ export default function Admin() {
             )}
           </div>
         </div>
+      ) : activeTab === "users" ? (
+        <AdminUsersView
+          users={usersList}
+          loading={usersLoading}
+          onRefresh={() => loadUsers(true)}
+        />
       ) : (
         /* Boshqa bo'limlar uchun toza arxitektura kartasi */
         <div className="rounded-2xl bg-white shadow-card p-6 border border-gray-100/60">
