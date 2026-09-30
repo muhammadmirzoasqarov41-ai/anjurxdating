@@ -26,11 +26,17 @@ import {
   getAdminProfilesData,
   getAdminReportsData,
   getAdminMatchesData,
+  getAdminChatsData,
+  getAdminModerationData,
 } from "../lib/admin";
 import AdminUsersView from "../components/admin/AdminUsersView";
 import AdminProfilesView from "../components/admin/AdminProfilesView";
 import AdminReportsView from "../components/admin/AdminReportsView";
 import AdminMatchesView from "../components/admin/AdminMatchesView";
+import AdminChatsView from "../components/admin/AdminChatsView";
+import AdminModerationView from "../components/admin/AdminModerationView";
+import AdminStatisticsView from "../components/admin/AdminStatisticsView";
+import AdminSettingsView from "../components/admin/AdminSettingsView";
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -245,6 +251,87 @@ export default function Admin() {
     }
   }, [activeTab, matchesLoaded, loadMatches]);
 
+  // CHATS SECTION DATA MANAGEMENT
+  const [chatsList, setChatsList] = useState([]);
+  const [chatsStats, setChatsStats] = useState({
+    totalConversations: 0,
+    activeConversations: 0,
+    todayConversations: 0,
+    inactiveConversations: 0,
+  });
+  const [chatsLoading, setChatsLoading] = useState(false);
+  const [chatsLoaded, setChatsLoaded] = useState(false);
+  const [chatsError, setChatsError] = useState(null);
+
+  const loadChats = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setChatsLoading(true);
+    setChatsError(null);
+
+    try {
+      const { conversations, stats } = await getAdminChatsData();
+      setChatsList(conversations);
+      setChatsStats(stats);
+      setChatsLoaded(true);
+    } catch (err) {
+      console.error("Suhbatlarni yuklashda xatolik:", err);
+      setChatsError(
+        "Suhbatlarni yuklashda xatolik yuz berdi. Iltimos qayta urinib ko'ring."
+      );
+    } finally {
+      setChatsLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "chats" && !chatsLoaded) {
+      loadChats();
+    }
+  }, [activeTab, chatsLoaded, loadChats]);
+
+  // MODERATION SECTION DATA MANAGEMENT
+  const [moderationItems, setModerationItems] = useState([]);
+  const [moderationStats, setModerationStats] = useState({
+    pendingCount: 0,
+    reviewingCount: 0,
+    resolvedCount: 0,
+    dismissedCount: 0,
+    reportedUsersCount: 0,
+    suspendedUsersCount: 0,
+    totalItems: 0,
+  });
+  const [moderationLoading, setModerationLoading] = useState(false);
+  const [moderationLoaded, setModerationLoaded] = useState(false);
+  const [moderationError, setModerationError] = useState(null);
+
+  const loadModeration = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setModerationLoading(true);
+    setModerationError(null);
+
+    try {
+      const { queueItems, stats } = await getAdminModerationData();
+      setModerationItems(queueItems);
+      setModerationStats(stats);
+      setModerationLoaded(true);
+    } catch (err) {
+      console.error("Moderatsiyani yuklashda xatolik:", err);
+      setModerationError(
+        "Moderatsiya ma'lumotlarini yuklashda xatolik yuz berdi. Iltimos qayta urinib ko'ring."
+      );
+    } finally {
+      setModerationLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "moderation" && !moderationLoaded) {
+      loadModeration();
+    }
+  }, [activeTab, moderationLoaded, loadModeration]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -317,6 +404,8 @@ export default function Admin() {
                   else if (activeTab === "profiles") loadProfiles(true);
                   else if (activeTab === "reports") loadReports(true);
                   else if (activeTab === "matches") loadMatches(true);
+                  else if (activeTab === "chats") loadChats(true);
+                  else if (activeTab === "moderation") loadModeration(true);
                   else loadData(true);
                 }}
                 disabled={
@@ -325,7 +414,9 @@ export default function Admin() {
                   usersLoading ||
                   profilesLoading ||
                   reportsLoading ||
-                  matchesLoading
+                  matchesLoading ||
+                  chatsLoading ||
+                  moderationLoading
                 }
                 className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
                 title="Ma'lumotlarni yangilash"
@@ -337,7 +428,9 @@ export default function Admin() {
                     usersLoading ||
                     profilesLoading ||
                     reportsLoading ||
-                    matchesLoading
+                    matchesLoading ||
+                    chatsLoading ||
+                    moderationLoading
                       ? "animate-spin"
                       : ""
                   }
@@ -719,6 +812,26 @@ export default function Admin() {
           error={matchesError}
           onRefresh={() => loadMatches(true)}
         />
+      ) : activeTab === "chats" ? (
+        <AdminChatsView
+          conversations={chatsList}
+          stats={chatsStats}
+          loading={chatsLoading}
+          error={chatsError}
+          onRefresh={() => loadChats(true)}
+        />
+      ) : activeTab === "moderation" ? (
+        <AdminModerationView
+          queueItems={moderationItems}
+          stats={moderationStats}
+          loading={moderationLoading}
+          error={moderationError}
+          onRefresh={() => loadModeration(true)}
+        />
+      ) : activeTab === "statistics" ? (
+        <AdminStatisticsView />
+      ) : activeTab === "settings" ? (
+        <AdminSettingsView />
       ) : (
         /* Boshqa bo'limlar uchun toza arxitektura kartasi */
         <div className="rounded-2xl bg-white shadow-card p-6 border border-gray-100/60">

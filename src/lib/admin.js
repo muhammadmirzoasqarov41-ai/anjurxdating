@@ -716,5 +716,316 @@ export async function getAdminMatchMessages(matchId) {
   }
 }
 
+/**
+ * Fetches all chat conversations with activity statistics
+ */
+export async function getAdminChatsData() {
+  const { matches } = await getAdminMatchesData();
+
+  const now = Date.now();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayMs = startOfToday.getTime();
+
+  let totalConversations = matches.length;
+  let activeConversations = 0;
+  let todayConversations = 0;
+  let totalWithLastMessage = 0;
+
+  matches.forEach((m) => {
+    if (m.hasChat) {
+      activeConversations++;
+      totalWithLastMessage++;
+    }
+    const lastActiveMs =
+      m.lastMessageAt?.toMillis?.() ||
+      (m.lastMessageAt?.seconds ? m.lastMessageAt.seconds * 1000 : 0) ||
+      m.createdAt?.toMillis?.() ||
+      (m.createdAt?.seconds ? m.createdAt.seconds * 1000 : 0) ||
+      0;
+    if (lastActiveMs >= todayMs) {
+      todayConversations++;
+    }
+  });
+
+  const stats = {
+    totalConversations,
+    activeConversations,
+    todayConversations,
+    inactiveConversations: totalConversations - activeConversations,
+  };
+
+  return { conversations: matches, stats };
+}
+
+/**
+ * Fetches central moderation queue and aggregated metrics
+ */
+export async function getAdminModerationData() {
+  const { reports, stats: reportStats } = await getAdminReportsData();
+  const users = await getAdminUsersData();
+
+  // Aggregate reported/flagged users
+  const reportedUsers = users.filter(
+    (u) => (u.reportsCount && u.reportsCount > 0) || u.status === "suspended" || u.status === "banned"
+  );
+
+  const queueItems = [];
+
+  // Add report items to queue
+  reports.forEach((r) => {
+    queueItems.push({
+      id: `rep_${r.id}`,
+      originalId: r.id,
+      type: "report",
+      title: r.reason === "fake_profile"
+        ? "Soxta profil shikoyati"
+        : r.reason === "harassment"
+        ? "Tazyiq / Haqorat shikoyati"
+        : r.reason === "spam"
+        ? "Spam / Reklama shikoyati"
+        : r.reason === "inappropriate_content"
+        ? "Nomaqbul kontent shikoyati"
+        : r.reason === "scam"
+        ? "Firibgarlik shikoyati"
+        : "Foydalanuvchi shikoyati",
+      reason: r.reason,
+      description: r.description,
+      priority: r.priority || "medium",
+      status: r.status || "pending",
+      createdAt: r.createdAt,
+      reviewedAt: r.reviewedAt,
+      reviewedBy: r.reviewedBy,
+      targetUser: {
+        uid: r.reportedUserId,
+        displayName: r.reportedUserName,
+        email: r.reportedUserEmail,
+        avatar: r.reportedUserAvatar,
+        profile: r.reportedUserProfile,
+      },
+      initiator: {
+        uid: r.reporterId,
+        displayName: r.reporterName,
+        email: r.reporterEmail,
+        avatar: r.reporterAvatar,
+      },
+      rawReport: r,
+    });
+  });
+
+  // Sort queue by priority and date
+  queueItems.sort((a, b) => {
+    const priorityWeight = { high: 3, medium: 2, low: 1 };
+    const pDiff = (priorityWeight[b.priority] || 2) - (priorityWeight[a.priority] || 2);
+    if (pDiff !== 0) return pDiff;
+
+    const timeA =
+      a.createdAt?.toMillis?.() ||
+      (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0) ||
+      0;
+    const timeB =
+      b.createdAt?.toMillis?.() ||
+      (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0) ||
+      0;
+    return timeB - timeA;
+  });
+
+  const stats = {
+    pendingCount: reportStats.pending,
+    reviewingCount: reportStats.reviewing,
+    resolvedCount: reportStats.resolved,
+    dismissedCount: reportStats.dismissed,
+    reportedUsersCount: reportedUsers.length,
+    suspendedUsersCount: users.filter((u) => u.status === "suspended" || u.status === "banned").length,
+    totalItems: queueItems.length,
+  };
+
+  return { queueItems, stats, reportedUsers };
+}
+
+/**
+ * Fetches comprehensive analytics across all real collections with time filters
+ */
+export async function getAdminComprehensiveStats(timeRange = "30") {
+  const users = await getAdminUsersData();
+  const profiles = await getAdminProfilesData();
+  const { matches } = await getAdminMatchesData();
+  const { reports } = await getAdminReportsData();
+
+  const now = Date.now();
+  let cutoffMs = 0;
+  if (timeRange === "1") {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    cutoffMs = startOfToday.getTime();
+  } else if (timeRange === "7") {
+    cutoffMs = now - 7 * 24 * 60 * 60 * 1000;
+  } else if (timeRange === "30") {
+    cutoffMs = now - 30 * 24 * 60 * 60 * 1000;
+  } else if (timeRange === "90") {
+    cutoffMs = now - 90 * 24 * 60 * 60 * 1000;
+  }
+
+  // User metrics
+  const totalUsers = users.length;
+  const newUsersInRange = users.filter((u) => {
+    const t =
+      u.createdAt?.toMillis?.() ||
+      (u.createdAt?.seconds ? u.createdAt.seconds * 1000 : 0) ||
+      0;
+    return t >= cutoffMs;
+  }).length;
+  const verifiedUsers = users.filter((u) => u.verified).length;
+  const activeAccounts = users.filter((u) => u.status === "active").length;
+
+  // Profile metrics
+  const totalProfiles = profiles.length;
+  const completeProfiles = profiles.filter((p) => p.isComplete).length;
+  const botProfiles = profiles.filter((p) => p.isBot).length;
+
+  // Match metrics
+  const totalMatches = matches.length;
+  const newMatchesInRange = matches.filter((m) => {
+    const t =
+      m.createdAt?.toMillis?.() ||
+      (m.createdAt?.seconds ? m.createdAt.seconds * 1000 : 0) ||
+      0;
+    return t >= cutoffMs;
+  }).length;
+  const matchesWithChat = matches.filter((m) => m.hasChat).length;
+
+  // Report metrics
+  const totalReports = reports.length;
+  const reportsByReason = {
+    fake_profile: 0,
+    harassment: 0,
+    spam: 0,
+    inappropriate_content: 0,
+    scam: 0,
+    other: 0,
+  };
+  const reportsByStatus = {
+    pending: 0,
+    reviewing: 0,
+    resolved: 0,
+    dismissed: 0,
+  };
+
+  reports.forEach((r) => {
+    const reasonKey = r.reason || "other";
+    if (reportsByReason[reasonKey] !== undefined) {
+      reportsByReason[reasonKey]++;
+    } else {
+      reportsByReason.other++;
+    }
+
+    const statusKey = r.status || "pending";
+    if (reportsByStatus[statusKey] !== undefined) {
+      reportsByStatus[statusKey]++;
+    }
+  });
+
+  // Calculate day-by-day activity distribution for charts
+  const daysCount = timeRange === "1" ? 1 : timeRange === "7" ? 7 : timeRange === "30" ? 14 : 14;
+  const dailyDistribution = [];
+
+  for (let i = daysCount - 1; i >= 0; i--) {
+    const dayStart = new Date(now - i * 24 * 60 * 60 * 1000);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayStartMs = dayStart.getTime();
+    const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
+
+    const dayUsers = users.filter((u) => {
+      const t =
+        u.createdAt?.toMillis?.() ||
+        (u.createdAt?.seconds ? u.createdAt.seconds * 1000 : 0) ||
+        0;
+      return t >= dayStartMs && t < dayEndMs;
+    }).length;
+
+    const dayMatches = matches.filter((m) => {
+      const t =
+        m.createdAt?.toMillis?.() ||
+        (m.createdAt?.seconds ? m.createdAt.seconds * 1000 : 0) ||
+        0;
+      return t >= dayStartMs && t < dayEndMs;
+    }).length;
+
+    const dayReports = reports.filter((r) => {
+      const t =
+        r.createdAt?.toMillis?.() ||
+        (r.createdAt?.seconds ? r.createdAt.seconds * 1000 : 0) ||
+        0;
+      return t >= dayStartMs && t < dayEndMs;
+    }).length;
+
+    dailyDistribution.push({
+      dateLabel: `${dayStart.getDate()}/${dayStart.getMonth() + 1}`,
+      users: dayUsers,
+      matches: dayMatches,
+      reports: dayReports,
+    });
+  }
+
+  return {
+    users: {
+      total: totalUsers,
+      newInRange: newUsersInRange,
+      verified: verifiedUsers,
+      active: activeAccounts,
+    },
+    profiles: {
+      total: totalProfiles,
+      complete: completeProfiles,
+      incomplete: totalProfiles - completeProfiles,
+      bots: botProfiles,
+    },
+    matches: {
+      total: totalMatches,
+      newInRange: newMatchesInRange,
+      withChat: matchesWithChat,
+      withoutChat: totalMatches - matchesWithChat,
+    },
+    reports: {
+      total: totalReports,
+      byReason: reportsByReason,
+      byStatus: reportsByStatus,
+    },
+    dailyDistribution,
+  };
+}
+
+/**
+ * Fetches recent audit actions recorded in `admin_logs`
+ */
+export async function getAdminAuditLogs() {
+  try {
+    const logsSnap = await getDocs(collection(db, "admin_logs"));
+    const logs = logsSnap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    }));
+
+    // Sort newest first
+    logs.sort((a, b) => {
+      const timeA =
+        a.createdAt?.toMillis?.() ||
+        (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0) ||
+        0;
+      const timeB =
+        b.createdAt?.toMillis?.() ||
+        (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0) ||
+        0;
+      return timeB - timeA;
+    });
+
+    return logs.slice(0, 30);
+  } catch (err) {
+    console.warn("getAdminAuditLogs warning:", err);
+    return [];
+  }
+}
+
+
 
 
