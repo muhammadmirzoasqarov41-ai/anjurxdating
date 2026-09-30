@@ -326,3 +326,66 @@ export async function updateUserAdminStatus(uid, { status, adminNote, verified }
   });
 }
 
+/**
+ * Fetches all real profiles from `tinder_profiles` collection
+ * cross-referenced with `users` collection for account email and status.
+ */
+export async function getAdminProfilesData() {
+  const usersEmailMap = new Map();
+  const usersStatusMap = new Map();
+
+  // 1. Fetch user accounts to cross-reference email and account status
+  try {
+    const usersSnap = await getDocs(collection(db, "users"));
+    usersSnap.forEach((d) => {
+      const data = d.data();
+      usersEmailMap.set(d.id, data.email || null);
+      usersStatusMap.set(d.id, data.status || "active");
+    });
+  } catch (err) {
+    console.warn("getAdminProfilesData users query warning:", err);
+  }
+
+  // 2. Fetch all profiles from `tinder_profiles`
+  const profilesList = [];
+  try {
+    const profilesSnap = await getDocs(collection(db, "tinder_profiles"));
+    profilesSnap.forEach((d) => {
+      const data = d.data();
+      const uid = d.id;
+      const rawPhotos = Array.isArray(data.photos) ? data.photos : [];
+      const photos = rawPhotos.filter(Boolean);
+
+      const isComplete = Boolean(
+        data.displayName &&
+        photos.length > 0 &&
+        data.age
+      );
+
+      profilesList.push({
+        id: uid,
+        uid,
+        displayName: data.displayName || "Nomsiz",
+        username: data.username || null,
+        age: data.age ?? null,
+        gender: data.gender || null,
+        job: data.job || null,
+        bio: data.bio || null,
+        photos,
+        distanceKm: data.distanceKm ?? null,
+        interests: Array.isArray(data.interests) ? data.interests : [],
+        isBot: Boolean(data.isBot || uid.startsWith("bot_")),
+        createdAt: data.createdAt || data.updatedAt || null,
+        updatedAt: data.updatedAt || null,
+        userEmail: usersEmailMap.get(uid) || null,
+        userStatus: usersStatusMap.get(uid) || "active",
+        isComplete,
+      });
+    });
+  } catch (err) {
+    console.warn("getAdminProfilesData profiles query warning:", err);
+  }
+
+  return profilesList;
+}
+

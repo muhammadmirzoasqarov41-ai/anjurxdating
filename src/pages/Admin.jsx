@@ -20,8 +20,13 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
-import { getAdminDashboardData, getAdminUsersData } from "../lib/admin";
+import {
+  getAdminDashboardData,
+  getAdminUsersData,
+  getAdminProfilesData,
+} from "../lib/admin";
 import AdminUsersView from "../components/admin/AdminUsersView";
+import AdminProfilesView from "../components/admin/AdminProfilesView";
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -129,6 +134,33 @@ export default function Admin() {
     }
   }, [activeTab, usersLoaded, loadUsers]);
 
+  // PROFILES SECTION DATA MANAGEMENT
+  const [profilesList, setProfilesList] = useState([]);
+  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
+
+  const loadProfiles = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setProfilesLoading(true);
+
+    try {
+      const data = await getAdminProfilesData();
+      setProfilesList(data);
+      setProfilesLoaded(true);
+    } catch (err) {
+      console.error("Profillarni yuklashda xatolik:", err);
+    } finally {
+      setProfilesLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "profiles" && !profilesLoaded) {
+      loadProfiles();
+    }
+  }, [activeTab, profilesLoaded, loadProfiles]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -198,15 +230,20 @@ export default function Admin() {
               <button
                 onClick={() => {
                   if (activeTab === "users") loadUsers(true);
+                  else if (activeTab === "profiles") loadProfiles(true);
                   else loadData(true);
                 }}
-                disabled={loading || refreshing || usersLoading}
+                disabled={loading || refreshing || usersLoading || profilesLoading}
                 className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
                 title="Ma'lumotlarni yangilash"
               >
                 <RefreshCw
                   size={16}
-                  className={refreshing || usersLoading ? "animate-spin" : ""}
+                  className={
+                    refreshing || usersLoading || profilesLoading
+                      ? "animate-spin"
+                      : ""
+                  }
                 />
               </button>
 
@@ -562,6 +599,12 @@ export default function Admin() {
           users={usersList}
           loading={usersLoading}
           onRefresh={() => loadUsers(true)}
+        />
+      ) : activeTab === "profiles" ? (
+        <AdminProfilesView
+          profiles={profilesList}
+          loading={profilesLoading}
+          onRefresh={() => loadProfiles(true)}
         />
       ) : (
         /* Boshqa bo'limlar uchun toza arxitektura kartasi */
