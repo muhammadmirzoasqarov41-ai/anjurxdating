@@ -9,6 +9,8 @@ import Discover from "./pages/Discover";
 import Matches from "./pages/Matches";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
+import Admin from "./pages/Admin";
+import AdminRoute from "./components/AdminRoute";
 
 export default function App() {
   const { init, initializing } = useAuthStore();
@@ -77,6 +79,16 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
             </ProtectedRoute>
           }
         />

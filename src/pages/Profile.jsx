@@ -1,5 +1,7 @@
-import { LogOut, MapPin, Briefcase } from "lucide-react";
+import { Link } from "react-router-dom";
+import { LogOut, MapPin, Briefcase, Shield } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import { isSuperAdminUser } from "../components/AdminRoute";
 
 export default function Profile() {
   const { user, profile, logout } = useAuthStore();
@@ -50,9 +52,20 @@ export default function Profile() {
             </p>
           )}
 
+          {isSuperAdminUser(user) && (
+            <Link
+              to="/admin"
+              className="mt-6 w-full py-3 rounded-full flame-bg text-white font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+            >
+              <Shield size={18} /> Admin Panel
+            </Link>
+          )}
+
           <button
             onClick={logout}
-            className="mt-6 w-full py-3 rounded-full border border-gray-200 text-gray-700 font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+            className={`${
+              isSuperAdminUser(user) ? "mt-3" : "mt-6"
+            } w-full py-3 rounded-full border border-gray-200 text-gray-700 font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors`}
           >
             <LogOut size={18} /> Chiqish
           </button>

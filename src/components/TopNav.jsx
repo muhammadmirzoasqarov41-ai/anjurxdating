@@ -1,8 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { Flame, MessageCircle, User } from "lucide-react";
+import { Flame, MessageCircle, User, Shield } from "lucide-react";
+import { useAuthStore } from "../store/authStore";
+import { isSuperAdminUser } from "./AdminRoute";
 
 // barra superior tipo tinder web: logo a la izquierda y los tres accesos.
 export default function TopNav() {
+  const { user } = useAuthStore();
   const link = ({ isActive }) =>
     "flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-colors " +
     (isActive ? "text-flame-start" : "text-gray-400 hover:text-gray-600");
@@ -25,6 +28,11 @@ export default function TopNav() {
           <NavLink to="/profile" className={link} title="Profil" aria-label="Profil">
             <User size={18} />
           </NavLink>
+          {isSuperAdminUser(user) && (
+            <NavLink to="/admin" className={link} title="Admin Panel" aria-label="Admin Panel">
+              <Shield size={18} />
+            </NavLink>
+          )}
         </nav>
       </div>
     </header>

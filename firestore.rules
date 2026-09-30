@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated()
+        && request.auth.token.email == "luxaidevs@gmail.com"
+        && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Profiles: users can read profiles for the swipe deck, only owner can edit their own
+    match /tinder_profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Swipes: users record their likes and nopes
+    match /tinder_swipes/{swipeId} {
+      allow read, write: if isAuthenticated() || isSuperAdmin();
+    }
+
+    // Matches and realtime chat messages
+    match /tinder_matches/{matchId} {
+      allow read: if (isAuthenticated() && request.auth.uid in resource.data.users) || isSuperAdmin();
+      allow create: if isAuthenticated() || isSuperAdmin();
+      allow update: if (isAuthenticated() && request.auth.uid in resource.data.users) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+
+      match /messages/{messageId} {
+        allow read, create: if isAuthenticated() || isSuperAdmin();
+        allow update, delete: if isSuperAdmin();
+      }
+    }
+
+    // Reports: normal users can submit reports, only super admin can read/moderate
+    match /reports/{reportId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isSuperAdmin();
+    }
+
+    // Catch-all administrative fallback
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}
