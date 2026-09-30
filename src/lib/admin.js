@@ -389,3 +389,147 @@ export async function getAdminProfilesData() {
   return profilesList;
 }
 
+/**
+ * Fetches all reports with detailed reporter and reported user information
+ * and computes real-time status statistics.
+ */
+export async function getAdminReportsData() {
+  const usersMap = new Map();
+  const profilesMap = new Map();
+
+  // 1. Fetch user accounts
+  try {
+    const usersSnap = await getDocs(collection(db, "users"));
+    usersSnap.forEach((d) => {
+      usersMap.set(d.id, d.data());
+    });
+  } catch (err) {
+    console.warn("getAdminReportsData users warning:", err);
+  }
+
+  // 2. Fetch profiles
+  try {
+    const profilesSnap = await getDocs(collection(db, "tinder_profiles"));
+    profilesSnap.forEach((d) => {
+      profilesMap.set(d.id, d.data());
+    });
+  } catch (err) {
+    console.warn("getAdminReportsData profiles warning:", err);
+  }
+
+  // 3. Fetch reports
+  const reportsList = [];
+  const stats = {
+    total: 0,
+    pending: 0,
+    reviewing: 0,
+    resolved: 0,
+    dismissed: 0,
+  };
+
+  try {
+    const reportsSnap = await getDocs(collection(db, "reports"));
+    reportsSnap.forEach((d) => {
+      const data = d.data();
+      const reportId = d.id;
+
+      const reporterId =
+        data.reporterId || data.reporterUid || data.userId || null;
+      const reportedUserId =
+        data.reportedUserId || data.targetUid || data.reportedUid || null;
+
+      const reporterUser = reporterId ? usersMap.get(reporterId) : null;
+      const reporterProfile = reporterId ? profilesMap.get(reporterId) : null;
+
+      const reportedUser = reportedUserId ? usersMap.get(reportedUserId) : null;
+      const reportedProfile = reportedUserId ? profilesMap.get(reportedUserId) : null;
+
+      const status = data.status || "pending";
+      const priority = data.priority || "medium";
+      const reason = data.reason || "other";
+
+      const reportItem = {
+        id: reportId,
+        reportId,
+        reporterId,
+        reportedUserId,
+        reporterName:
+          data.reporterName ||
+          reporterProfile?.displayName ||
+          reporterUser?.displayName ||
+          (reporterId ? `User (${reporterId.slice(0, 6)})` : "Noma'lum"),
+        reporterUsername: reporterProfile?.username || null,
+        reporterEmail: reporterUser?.email || null,
+        reporterAvatar: reporterProfile?.photos?.[0] || null,
+
+        reportedUserName:
+          data.reportedUserName ||
+          reportedProfile?.displayName ||
+          reportedUser?.displayName ||
+          (reportedUserId ? `User (${reportedUserId.slice(0, 6)})` : "Noma'lum"),
+        reportedUserUsername: reportedProfile?.username || null,
+        reportedUserEmail: reportedUser?.email || null,
+        reportedUserAvatar: reportedProfile?.photos?.[0] || null,
+        reportedUserProfile: reportedProfile
+          ? {
+              age: reportedProfile.age || null,
+              job: reportedProfile.job || null,
+              bio: reportedProfile.bio || null,
+              photos: Array.isArray(reportedProfile.photos)
+                ? reportedProfile.photos
+                : [],
+              distanceKm: reportedProfile.distanceKm ?? null,
+              interests: Array.isArray(reportedProfile.interests)
+                ? reportedProfile.interests
+                : [],
+            }
+          : null,
+
+        reason,
+        description: data.description || "",
+        status,
+        priority,
+        createdAt: data.createdAt || null,
+        reviewedAt: data.reviewedAt || null,
+        reviewedBy: data.reviewedBy || null,
+      };
+
+      reportsList.push(reportItem);
+
+      // Aggregate stats
+      stats.total++;
+      if (status === "pending") stats.pending++;
+      else if (status === "reviewing") stats.reviewing++;
+      else if (status === "resolved") stats.resolved++;
+      else if (status === "dismissed") stats.dismissed++;
+    });
+  } catch (err) {
+    console.warn("getAdminReportsData reports query warning:", err);
+  }
+
+  return { reports: reportsList, stats };
+}
+
+/**
+ * Updates a report's status safely (e.g. reviewing, resolved, dismissed, pending)
+ */
+export async function updateReportStatus(reportId, newStatus) {
+  const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
+  await setDoc(
+    doc(db, "reports", reportId),
+    {
+      status: newStatus,
+      reviewedAt: serverTimestamp(),
+      reviewedBy: "luxaidevs@gmail.com",
+    },
+    { merge: true }
+  );
+
+  await logAdminAuditAction({
+    action: "UPDATE_REPORT_STATUS",
+    targetUid: reportId,
+    details: { reportId, status: newStatus },
+  });
+}
+
+

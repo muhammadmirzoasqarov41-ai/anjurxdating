@@ -24,9 +24,11 @@ import {
   getAdminDashboardData,
   getAdminUsersData,
   getAdminProfilesData,
+  getAdminReportsData,
 } from "../lib/admin";
 import AdminUsersView from "../components/admin/AdminUsersView";
 import AdminProfilesView from "../components/admin/AdminProfilesView";
+import AdminReportsView from "../components/admin/AdminReportsView";
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -161,6 +163,46 @@ export default function Admin() {
     }
   }, [activeTab, profilesLoaded, loadProfiles]);
 
+  // REPORTS SECTION DATA MANAGEMENT
+  const [reportsList, setReportsList] = useState([]);
+  const [reportsStats, setReportsStats] = useState({
+    total: 0,
+    pending: 0,
+    reviewing: 0,
+    resolved: 0,
+    dismissed: 0,
+  });
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsLoaded, setReportsLoaded] = useState(false);
+  const [reportsError, setReportsError] = useState(null);
+
+  const loadReports = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setReportsLoading(true);
+    setReportsError(null);
+
+    try {
+      const { reports, stats } = await getAdminReportsData();
+      setReportsList(reports);
+      setReportsStats(stats);
+      setReportsLoaded(true);
+    } catch (err) {
+      console.error("Shikoyatlarni yuklashda xatolik:", err);
+      setReportsError(
+        "Shikoyatlarni yuklashda xatolik yuz berdi. Iltimos qayta urinib ko'ring."
+      );
+    } finally {
+      setReportsLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "reports" && !reportsLoaded) {
+      loadReports();
+    }
+  }, [activeTab, reportsLoaded, loadReports]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -231,16 +273,26 @@ export default function Admin() {
                 onClick={() => {
                   if (activeTab === "users") loadUsers(true);
                   else if (activeTab === "profiles") loadProfiles(true);
+                  else if (activeTab === "reports") loadReports(true);
                   else loadData(true);
                 }}
-                disabled={loading || refreshing || usersLoading || profilesLoading}
+                disabled={
+                  loading ||
+                  refreshing ||
+                  usersLoading ||
+                  profilesLoading ||
+                  reportsLoading
+                }
                 className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
                 title="Ma'lumotlarni yangilash"
               >
                 <RefreshCw
                   size={16}
                   className={
-                    refreshing || usersLoading || profilesLoading
+                    refreshing ||
+                    usersLoading ||
+                    profilesLoading ||
+                    reportsLoading
                       ? "animate-spin"
                       : ""
                   }
@@ -605,6 +657,14 @@ export default function Admin() {
           profiles={profilesList}
           loading={profilesLoading}
           onRefresh={() => loadProfiles(true)}
+        />
+      ) : activeTab === "reports" ? (
+        <AdminReportsView
+          reports={reportsList}
+          stats={reportsStats}
+          loading={reportsLoading}
+          error={reportsError}
+          onRefresh={() => loadReports(true)}
         />
       ) : (
         /* Boshqa bo'limlar uchun toza arxitektura kartasi */
