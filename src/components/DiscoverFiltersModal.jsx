@@ -1,10 +1,20 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, SlidersHorizontal, RotateCcw, Check } from "lucide-react";
+import {
+  X,
+  SlidersHorizontal,
+  RotateCcw,
+  Check,
+  ShieldCheck,
+  Activity,
+  Flame,
+  Languages,
+} from "lucide-react";
 import {
   STANDARD_INTERESTS,
   DATING_INTENTIONS,
   CITIES,
+  STANDARD_LANGUAGES,
 } from "../lib/matching";
 
 export default function DiscoverFiltersModal({
@@ -22,6 +32,14 @@ export default function DiscoverFiltersModal({
   const [selectedInterest, setSelectedInterest] = useState(
     currentFilters.interest || "all"
   );
+  const [language, setLanguage] = useState(currentFilters.language || "all");
+  const [verifiedOnly, setVerifiedOnly] = useState(
+    Boolean(currentFilters.verifiedOnly)
+  );
+  const [onlineOnly, setOnlineOnly] = useState(
+    Boolean(currentFilters.onlineOnly)
+  );
+  const [newOnly, setNewOnly] = useState(Boolean(currentFilters.newOnly));
 
   const handleReset = () => {
     setMinAge(18);
@@ -30,6 +48,10 @@ export default function DiscoverFiltersModal({
     setDatingIntention("all");
     setCity("all");
     setSelectedInterest("all");
+    setLanguage("all");
+    setVerifiedOnly(false);
+    setOnlineOnly(false);
+    setNewOnly(false);
   };
 
   const handleApply = () => {
@@ -40,18 +62,34 @@ export default function DiscoverFiltersModal({
       datingIntention,
       city,
       interest: selectedInterest,
+      language,
+      verifiedOnly,
+      onlineOnly,
+      newOnly,
     });
     onClose();
   };
+
+  // Count active filters
+  let activeCount = 0;
+  if (minAge !== 18 || maxAge !== 45) activeCount++;
+  if (gender !== "all") activeCount++;
+  if (datingIntention !== "all") activeCount++;
+  if (city !== "all") activeCount++;
+  if (selectedInterest !== "all") activeCount++;
+  if (language !== "all") activeCount++;
+  if (verifiedOnly) activeCount++;
+  if (onlineOnly) activeCount++;
+  if (newOnly) activeCount++;
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
     >
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-card overflow-hidden my-auto max-h-[85vh] flex flex-col border border-gray-100">
+      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-card overflow-hidden my-auto max-h-[88vh] flex flex-col border border-gray-100">
         {/* Header */}
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -59,9 +97,16 @@ export default function DiscoverFiltersModal({
               <SlidersHorizontal size={16} />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-gray-900">
-                Discover Filtrlari
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-gray-900">
+                  Discover Filtrlari
+                </h3>
+                {activeCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full flame-bg text-white font-bold text-[10px]">
+                    {activeCount} faol
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-gray-400">
                 O'zingizga mos insonlarni tanlang
               </p>
@@ -177,12 +222,80 @@ export default function DiscoverFiltersModal({
             </select>
           </div>
 
+          {/* Muloqot Tili */}
+          <div className="space-y-1.5">
+            <label className="font-bold text-gray-800 flex items-center gap-1.5">
+              <Languages size={13} className="text-gray-500" /> Muloqot tili
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 outline-none text-xs font-semibold text-gray-800"
+            >
+              <option value="all">Istalgan til</option>
+              {STANDARD_LANGUAGES.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Maxsus Filtrlash Toggles */}
+          <div className="space-y-2 pt-1 border-t border-gray-100">
+            <label className="font-bold text-gray-800 block">
+              Maxsus parametrlar
+            </label>
+
+            {/* Tasdiqlangan profil */}
+            <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="flex items-center gap-2 font-medium text-gray-700">
+                <ShieldCheck size={16} className="text-blue-500" />
+                Faqat tasdiqlangan profillar
+              </span>
+              <input
+                type="checkbox"
+                checked={verifiedOnly}
+                onChange={(e) => setVerifiedOnly(e.target.checked)}
+                className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
+              />
+            </label>
+
+            {/* Hozir onlayn */}
+            <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="flex items-center gap-2 font-medium text-gray-700">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                Faqat onlayn bo'lganlar
+              </span>
+              <input
+                type="checkbox"
+                checked={onlineOnly}
+                onChange={(e) => setOnlineOnly(e.target.checked)}
+                className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
+              />
+            </label>
+
+            {/* Yangi profillar */}
+            <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="flex items-center gap-2 font-medium text-gray-700">
+                <Flame size={16} className="text-amber-500" />
+                Yangi qo'shilgan profillar
+              </span>
+              <input
+                type="checkbox"
+                checked={newOnly}
+                onChange={(e) => setNewOnly(e.target.checked)}
+                className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
+              />
+            </label>
+          </div>
+
           {/* Qiziqish bo'yicha filter */}
-          <div className="space-y-2">
+          <div className="space-y-2 pt-1 border-t border-gray-100">
             <label className="font-bold text-gray-800">
               Qiziqish bo'yicha saralash
             </label>
-            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto thin-scroll p-1 border border-gray-100 rounded-xl bg-gray-50/50">
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto thin-scroll p-1 border border-gray-100 rounded-xl bg-gray-50/50">
               <button
                 type="button"
                 onClick={() => setSelectedInterest("all")}

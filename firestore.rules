@@ -47,8 +47,38 @@ service cloud.firestore {
     }
 
     // Swipes: users record their likes and nopes
-    match /tinder_swipes/{swipeId} {
-      allow read, write: if isAuthenticated() || isSuperAdmin();
+    match /tinder_swipes/{userId} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+
+      match /likes/{targetId} {
+        allow create, update, delete: if isOwner(userId) || isSuperAdmin();
+        allow read: if isOwner(userId) || (isAuthenticated() && request.auth.uid == targetId) || isSuperAdmin();
+      }
+    }
+
+    // Favorites: users can only manage their own saved profiles
+    match /tinder_favorites/{userId} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+
+      match /items/{targetId} {
+        allow read, write: if isOwner(userId) || isSuperAdmin();
+      }
+    }
+
+    // Super Likes: sender can create, recipient/sender/admin can read
+    match /tinder_super_likes/{superLikeId} {
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.fromUid;
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.toUid || request.auth.uid == resource.data.fromUid || isAdminOrSuperAdmin());
+      allow update, delete: if (isAuthenticated() && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid)) || isAdminOrSuperAdmin();
+    }
+
+    // Blocks: users manage their own blocklist
+    match /tinder_blocks/{userId} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+
+      match /blocked/{targetId} {
+        allow read, write: if isOwner(userId) || isSuperAdmin();
+      }
     }
 
     // Matches and realtime chat messages

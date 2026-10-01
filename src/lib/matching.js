@@ -6,6 +6,7 @@
  * - Dating intention (goal alignment)
  * - Age preference & compatibility
  * - City / Location proximity
+ * - Languages matching
  * - Profile completeness & verification
  */
 
@@ -47,6 +48,14 @@ export const CITIES = [
   "Surxondaryo",
   "Jizzax",
   "Sirdaryo",
+];
+
+export const STANDARD_LANGUAGES = [
+  "O'zbekcha",
+  "Ruscha",
+  "Inglizcha",
+  "Turkcha",
+  "Qoraqalpoqcha",
 ];
 
 /**
@@ -110,14 +119,28 @@ export function calculateCompatibility(me = {}, target = {}) {
   if (targetAge) {
     if (targetAge >= preferredMinAge && targetAge <= preferredMaxAge) {
       score += 6;
+      matchReasons.push("Siz tanlagan yosh oralig'ida");
     }
     if (myAge && Math.abs(myAge - targetAge) <= 3) {
       score += 4;
-      matchReasons.push("Yoshi sizga juda mos");
+      if (!matchReasons.includes("Siz tanlagan yosh oralig'ida")) {
+        matchReasons.push("Yoshi sizga juda yaqin");
+      }
     }
   }
 
-  // 5. Profile Quality bonus (up to +5%)
+  // 5. Language compatibility (up to +5%)
+  const myLangs = Array.isArray(me?.languages) ? me.languages : [];
+  const targetLangs = Array.isArray(target?.languages) ? target.languages : [];
+  const sharedLangs = myLangs.filter((l) =>
+    targetLangs.some((tl) => tl.toLowerCase().trim() === l.toLowerCase().trim())
+  );
+  if (sharedLangs.length > 0) {
+    score += 4;
+    matchReasons.push(`Umumiy muloqot tili: ${sharedLangs[0]}`);
+  }
+
+  // 6. Profile Quality & Verification bonus (up to +5%)
   if (target?.bio && target.bio.trim().length > 30) {
     score += 2;
   }
@@ -125,8 +148,8 @@ export function calculateCompatibility(me = {}, target = {}) {
     score += 2;
   }
   if (target?.verified || target?.isVerified) {
-    score += 1;
-    matchReasons.push("Tasdiqlangan profil");
+    score += 2;
+    matchReasons.push("Tasdiqlangan ishonchli profil");
   }
 
   // Normalize between 50% and 98%
@@ -156,6 +179,10 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
   const cityFilter = filters?.city && filters.city !== "all" ? filters.city : null;
   const maxDistance = filters?.maxDistance ? Number(filters.maxDistance) : null;
   const requiredInterest = filters?.interest && filters.interest !== "all" ? filters.interest : null;
+  const languageFilter = filters?.language && filters.language !== "all" ? filters.language : null;
+  const verifiedOnly = Boolean(filters?.verifiedOnly);
+  const onlineOnly = Boolean(filters?.onlineOnly);
+  const newOnly = Boolean(filters?.newOnly);
 
   for (const card of rawCards) {
     // 1. Filter: Age
@@ -200,6 +227,33 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
       if (!hasInterest) continue;
     }
 
+    // 7. Filter: Language
+    if (languageFilter) {
+      const langs = Array.isArray(card.languages) ? card.languages : [];
+      const hasLang = langs.some(
+        (l) => l.trim().toLowerCase() === languageFilter.trim().toLowerCase()
+      );
+      if (!hasLang) continue;
+    }
+
+    // 8. Filter: Verified profile only
+    if (verifiedOnly && !card.verified && !card.isVerified) {
+      continue;
+    }
+
+    // 9. Filter: Online status only
+    if (onlineOnly && !card.online && !card.isOnline) {
+      continue;
+    }
+
+    // 10. Filter: New profile only
+    if (newOnly && !card.isNew) {
+      // If created in last 14 days or explicitly flagged as isNew
+      const createdAtMs = card.createdAt?.toMillis ? card.createdAt.toMillis() : null;
+      const isRecent = createdAtMs && Date.now() - createdAtMs < 14 * 86400 * 1000;
+      if (!isRecent) continue;
+    }
+
     // Calculate real compatibility
     const compatibility = calculateCompatibility(me, card);
 
@@ -209,7 +263,12 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
     });
   }
 
-  // Sort: highest compatibility score first, then mutual interests count, then distance
+  // Smart Sorting:
+  // 1. Higher compatibility score
+  // 2. More common interests
+  // 3. Verified profiles boost
+  // 4. Closer distance
+  // 5. Online/active profiles
   result.sort((a, b) => {
     const scoreDiff = (b.compatibility?.score || 50) - (a.compatibility?.score || 50);
     if (scoreDiff !== 0) return scoreDiff;
@@ -219,9 +278,17 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
       (a.compatibility?.mutualInterests?.length || 0);
     if (mutualDiff !== 0) return mutualDiff;
 
+    const verifiedA = a.verified || a.isVerified ? 1 : 0;
+    const verifiedB = b.verified || b.isVerified ? 1 : 0;
+    if (verifiedB !== verifiedA) return verifiedB - verifiedA;
+
     const distA = typeof a.distanceKm === "number" ? a.distanceKm : 999;
     const distB = typeof b.distanceKm === "number" ? b.distanceKm : 999;
-    return distA - distB;
+    if (distA !== distB) return distA - distB;
+
+    const onlineA = a.online || a.isOnline ? 1 : 0;
+    const onlineB = b.online || b.isOnline ? 1 : 0;
+    return onlineB - onlineA;
   });
 
   return result;

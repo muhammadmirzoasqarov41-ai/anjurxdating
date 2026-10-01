@@ -1,15 +1,33 @@
 import { useState } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
-import { MapPin, Briefcase, Info, Flame, ShieldCheck } from "lucide-react";
+import {
+  MapPin,
+  Briefcase,
+  Info,
+  Flame,
+  ShieldCheck,
+  Star,
+  Bookmark,
+} from "lucide-react";
 
 // Drag-and-swipe card with strict stacking context isolation.
-// Prevents the background card's data, stamps, or buttons from bleeding/popping forward.
-export default function SwipeCard({ profile, onSwipe, isTop, onOpenDetail }) {
+// Supports: Drag Left (Nope), Drag Right (Like), Drag Up (Super Like), Favorite toggle & Detail modal.
+export default function SwipeCard({
+  profile,
+  onSwipe,
+  isTop,
+  onOpenDetail,
+  onToggleFavorite,
+  isFavorited,
+}) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
   const rotate = useTransform(x, [-200, 200], [-18, 18]);
   const likeOpacity = useTransform(x, [40, 140], [0, 1]);
   const nopeOpacity = useTransform(x, [-140, -40], [1, 0]);
+  const superLikeOpacity = useTransform(y, [-120, -35], [1, 0]);
 
   const photos = profile.photos?.length ? profile.photos : [null];
   const compatibility = profile.compatibility || {
@@ -20,9 +38,17 @@ export default function SwipeCard({ profile, onSwipe, isTop, onOpenDetail }) {
 
   function handleDragEnd(_, info) {
     if (!isTop) return;
-    const threshold = 120;
-    if (info.offset.x > threshold) onSwipe("like");
-    else if (info.offset.x < -threshold) onSwipe("nope");
+    const thresholdX = 110;
+    const thresholdY = -100;
+
+    // Upward swipe -> Super Like
+    if (info.offset.y < thresholdY && Math.abs(info.offset.x) < 90) {
+      onSwipe("superlike");
+    } else if (info.offset.x > thresholdX) {
+      onSwipe("like");
+    } else if (info.offset.x < -thresholdX) {
+      onSwipe("nope");
+    }
   }
 
   // Tapping photo edges changes photo (only allowed on top card)
@@ -37,6 +63,8 @@ export default function SwipeCard({ profile, onSwipe, isTop, onOpenDetail }) {
     );
   }
 
+  const isOnline = profile.online || profile.isOnline;
+
   return (
     <motion.div
       className={`absolute inset-0 no-select isolate ${
@@ -46,6 +74,7 @@ export default function SwipeCard({ profile, onSwipe, isTop, onOpenDetail }) {
       }`}
       style={{
         x: isTop ? x : 0,
+        y: isTop ? y : 0,
         rotate: isTop ? rotate : 0,
         zIndex: isTop ? 30 : 10,
       }}
@@ -54,8 +83,8 @@ export default function SwipeCard({ profile, onSwipe, isTop, onOpenDetail }) {
         y: isTop ? 0 : 8,
       }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      drag={isTop ? "x" : false}
-      dragConstraints={{ left: 0, right: 0 }}
+      drag={isTop ? true : false}
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       dragElastic={0.65}
       onDragEnd={handleDragEnd}
       whileTap={isTop ? { cursor: "grabbing" } : undefined}
@@ -87,13 +116,20 @@ export default function SwipeCard({ profile, onSwipe, isTop, onOpenDetail }) {
           </div>
         )}
 
-        {/* Smart Matching Badges on Top */}
+        {/* Top Badges */}
         <div className="absolute top-6 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
-          {compatibility.score && (
-            <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-[11px] font-bold flex items-center gap-1 shadow-xs border border-white/20">
-              <span className="text-orange-400">🔥</span> {compatibility.score}% Moslik
-            </span>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {compatibility.score && (
+              <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-[11px] font-bold flex items-center gap-1 shadow-xs border border-white/20">
+                <span className="text-orange-400">🔥</span> {compatibility.score}% Moslik
+              </span>
+            )}
+            {profile.isSuperLikeReceived && (
+              <span className="px-2.5 py-1 rounded-full bg-sky-500 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs border border-white/20">
+                <Star size={11} fill="currentColor" /> Super Like
+              </span>
+            )}
+          </div>
 
           {compatibility.mutualInterests?.length > 0 && (
             <span className="px-2.5 py-1 rounded-full flame-bg text-white text-[11px] font-bold flex items-center gap-1 shadow-xs">
@@ -107,20 +143,31 @@ export default function SwipeCard({ profile, onSwipe, isTop, onOpenDetail }) {
           <div className="absolute inset-0 z-10" onClick={tapPhoto} />
         )}
 
-        {/* LIKE / NOPE stamps (ONLY rendered on top card during slide) */}
+        {/* LIKE / NOPE / SUPER LIKE stamps */}
         {isTop && (
           <>
+            {/* LIKE */}
             <motion.div
               style={{ opacity: likeOpacity }}
               className="absolute top-16 left-6 border-4 border-like text-like font-extrabold text-3xl px-3 py-1 rounded-lg -rotate-12 pointer-events-none z-20 shadow-sm"
             >
               LIKE
             </motion.div>
+
+            {/* NOPE */}
             <motion.div
               style={{ opacity: nopeOpacity }}
               className="absolute top-16 right-6 border-4 border-nope text-nope font-extrabold text-3xl px-3 py-1 rounded-lg rotate-12 pointer-events-none z-20 shadow-sm"
             >
               NOPE
+            </motion.div>
+
+            {/* SUPER LIKE */}
+            <motion.div
+              style={{ opacity: superLikeOpacity }}
+              className="absolute bottom-32 inset-x-8 border-4 border-superlike text-superlike font-black text-2xl px-4 py-2 rounded-xl text-center pointer-events-none z-20 shadow-lg bg-black/50 backdrop-blur-xs flex items-center justify-center gap-2"
+            >
+              <Star size={24} fill="currentColor" /> SUPER LIKE
             </motion.div>
           </>
         )}
@@ -132,25 +179,52 @@ export default function SwipeCard({ profile, onSwipe, isTop, onOpenDetail }) {
               <h2 className="text-2xl font-bold truncate">{profile.displayName}</h2>
               {profile.age && <span className="text-xl font-medium">{profile.age}</span>}
               {(profile.verified || profile.isVerified) && (
-                <span title="Tasdiqlangan" className="text-blue-400 mb-0.5">
+                <span title="Tasdiqlangan profil" className="text-blue-400 mb-0.5 shrink-0">
                   <ShieldCheck size={18} />
                 </span>
               )}
+              {isOnline && (
+                <span
+                  title="Hozir onlayn"
+                  className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white/60 mb-1.5 shrink-0"
+                />
+              )}
             </div>
 
-            {/* Info button to open Detail modal (only enabled on top card) */}
-            {isTop && onOpenDetail && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenDetail(profile);
-                }}
-                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition-colors pointer-events-auto flex-shrink-0 ml-2"
-                title="Batafsil ma'lumot"
-              >
-                <Info size={16} />
-              </button>
+            {/* Quick Actions (Favorite & Info) */}
+            {isTop && (
+              <div className="flex items-center gap-1.5 pointer-events-auto ml-2 shrink-0">
+                {onToggleFavorite && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFavorite(profile);
+                    }}
+                    className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition-colors"
+                    title={isFavorited ? "Saqlanganlardan o'chirish" : "Saqlash"}
+                  >
+                    <Bookmark
+                      size={15}
+                      className={isFavorited ? "text-amber-400 fill-amber-400" : "text-white"}
+                    />
+                  </button>
+                )}
+
+                {onOpenDetail && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenDetail(profile);
+                    }}
+                    className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition-colors"
+                    title="Batafsil ma'lumot"
+                  >
+                    <Info size={16} />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

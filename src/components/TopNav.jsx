@@ -1,13 +1,13 @@
 import { NavLink } from "react-router-dom";
-import { Flame, MessageCircle, User, Shield } from "lucide-react";
+import { Flame, MessageCircle, User, Shield, Star } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { isSuperAdminUser } from "./AdminRoute";
 
-// barra superior tipo tinder web: logo a la izquierda y los tres accesos.
+// barra superior tipo tinder web: logo a la izquierda y los accesos.
 export default function TopNav() {
   const { user } = useAuthStore();
   const link = ({ isActive }) =>
-    "flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-colors " +
+    "flex items-center gap-1.5 px-2.5 py-2 rounded-full text-sm font-semibold transition-colors " +
     (isActive ? "text-flame-start" : "text-gray-400 hover:text-gray-600");
 
   return (
@@ -18,9 +18,12 @@ export default function TopNav() {
           <span className="font-extrabold text-lg flame-text">AnjurXdating</span>
         </div>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-0.5">
           <NavLink to="/" end className={link} title="Kashf qilish" aria-label="Kashf qilish">
             <Flame size={18} />
+          </NavLink>
+          <NavLink to="/favorites" className={link} title="Saqlanganlar" aria-label="Saqlanganlar">
+            <Star size={18} />
           </NavLink>
           <NavLink to="/matches" className={link} title="Xabarlar" aria-label="Xabarlar">
             <MessageCircle size={18} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Star } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { getMatches } from "../lib/firestore";
 import EmptyState from "../components/EmptyState";
@@ -58,7 +58,7 @@ export default function Matches() {
               to={`/chat/${m.id}`}
               className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors"
             >
-              <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+              <div className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
                 {other.photo ? (
                   <img
                     src={other.photo}
@@ -70,13 +70,23 @@ export default function Matches() {
                     {other.displayName?.[0]?.toUpperCase()}
                   </span>
                 )}
+                {m.isSuperLike && (
+                  <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-superlike text-white flex items-center justify-center shadow-xs">
+                    <Star size={10} fill="currentColor" />
+                  </div>
+                )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-gray-900 truncate">
-                  {other.displayName}
+                <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                  <span>{other.displayName}</span>
+                  {m.isSuperLike && (
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-sky-50 text-superlike font-bold border border-sky-100 flex items-center gap-0.5">
+                      <Star size={9} fill="currentColor" /> Super Like
+                    </span>
+                  )}
                 </p>
                 <p className="text-sm text-gray-500 truncate">
-                  {m.lastMessage || "Match bo'ldingiz, bir-biringizga salom bering"}
+                  {m.lastMessage || (m.isSuperLike ? "Super Like orqali match bo'ldingiz!" : "Match bo'ldingiz, bir-biringizga salom bering")}
                 </p>
               </div>
             </Link>

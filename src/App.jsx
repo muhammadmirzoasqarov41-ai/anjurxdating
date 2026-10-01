@@ -6,6 +6,7 @@ import TopNav from "./components/TopNav";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Discover from "./pages/Discover";
+import Favorites from "./pages/Favorites";
 import Matches from "./pages/Matches";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
@@ -55,6 +56,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Discover />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/favorites"
+          element={
+            <ProtectedRoute>
+              <Favorites />
             </ProtectedRoute>
           }
         />

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useDeckStore } from "../store/deckStore";
+import { useFavoritesStore } from "../store/favoritesStore";
 import SwipeCard from "../components/SwipeCard";
 import ActionButtons from "../components/ActionButtons";
 import MatchModal from "../components/MatchModal";
@@ -22,10 +23,18 @@ export default function Discover() {
   const { user, profile } = useAuthStore();
   const { cards, index, loading, error, lastMatch, load, swipe, clearMatch } =
     useDeckStore();
+  const { favoriteIds, toggleFavorite, loadFavorites } = useFavoritesStore();
 
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState(profile?.preferences || {});
+
+  // Load favorites on mount
+  useEffect(() => {
+    if (user?.uid) {
+      loadFavorites(user.uid);
+    }
+  }, [user?.uid, loadFavorites]);
 
   // Load deck with user profile for Smart Matching and active filters
   useEffect(() => {
@@ -38,6 +47,7 @@ export default function Discover() {
 
   const remaining = cards.slice(index);
   const noMore = !loading && remaining.length === 0;
+  const currentCard = remaining[0];
 
   // Count active non-default filters
   const activeFiltersCount = useMemo(() => {
@@ -48,6 +58,10 @@ export default function Discover() {
     if (activeFilters.datingIntention && activeFilters.datingIntention !== "all") count++;
     if (activeFilters.city && activeFilters.city !== "all") count++;
     if (activeFilters.interest && activeFilters.interest !== "all") count++;
+    if (activeFilters.language && activeFilters.language !== "all") count++;
+    if (activeFilters.verifiedOnly) count++;
+    if (activeFilters.onlineOnly) count++;
+    if (activeFilters.newOnly) count++;
     return count;
   }, [activeFilters]);
 
@@ -187,18 +201,23 @@ export default function Discover() {
                   isTop={isTop}
                   onSwipe={(dir) => swipe(me, dir)}
                   onOpenDetail={(target) => setSelectedProfile(target)}
+                  onToggleFavorite={(target) => toggleFavorite(user?.uid, target)}
+                  isFavorited={favoriteIds.has(card.uid)}
                 />
               );
             })}
       </div>
 
-      {/* Action Buttons (Like / Nope) */}
+      {/* Action Buttons (Nope, Super Like, Like, Favorite) */}
       {!noMore && !error && !loading && (
         <div className="mt-5">
           <ActionButtons
             disabled={loading || remaining.length === 0}
             onNope={() => swipe(me, "nope")}
+            onSuperLike={() => swipe(me, "superlike")}
             onLike={() => swipe(me, "like")}
+            onToggleFavorite={() => currentCard && toggleFavorite(user?.uid, currentCard)}
+            isFavorited={Boolean(currentCard && favoriteIds.has(currentCard.uid))}
           />
         </div>
       )}
@@ -210,7 +229,10 @@ export default function Discover() {
             profile={selectedProfile}
             onClose={() => setSelectedProfile(null)}
             onLike={(target) => swipe(me, "like", target)}
+            onSuperLike={(target) => swipe(me, "superlike", target)}
             onNope={(target) => swipe(me, "nope", target)}
+            onToggleFavorite={(target) => toggleFavorite(user?.uid, target)}
+            isFavorited={Boolean(favoriteIds.has(selectedProfile.uid))}
           />
         )}
       </AnimatePresence>

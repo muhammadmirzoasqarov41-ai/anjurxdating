@@ -21,7 +21,7 @@ export const useDeckStore = create((set, get) => ({
     }
   },
 
-  // dir: "like" | "nope". me es el perfil propio (lo necesito para el match).
+  // dir: "like" | "nope" | "superlike". me es el perfil propio (lo necesito para el match).
   swipe: async (me, dir, targetCard = null) => {
     const { cards, index } = get();
     const card = targetCard || cards[index];
@@ -38,7 +38,9 @@ export const useDeckStore = create((set, get) => ({
     }
 
     try {
-      const matched = await recordSwipe(me, card, dir === "like");
+      const isSuper = dir === "superlike";
+      const isLiked = dir === "like" || isSuper;
+      const matched = await recordSwipe(me, card, isLiked, isSuper);
       if (matched) set({ lastMatch: matched });
     } catch (err) {
       console.error("No se pudo registrar el swipe", err);
