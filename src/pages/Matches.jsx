@@ -69,24 +69,24 @@ export default function Matches() {
               }`}
             >
               {/* Avatar with Super Like badge if applicable */}
-              <div className="relative w-13 h-13 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+              <div className="relative w-12 h-12 min-w-[48px] max-w-[48px] min-h-[48px] max-h-[48px] rounded-full overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center">
                 {other.photo ? (
                   <img
                     src={other.photo}
                     alt={other.displayName}
-                    className="w-full h-full object-cover"
+                    className="w-12 h-12 rounded-full object-cover shrink-0"
                   />
                 ) : (
-                  <span className="text-xl font-bold text-gray-400">
+                  <span className="text-base font-bold text-gray-400">
                     {other.displayName?.[0]?.toUpperCase()}
                   </span>
                 )}
                 {m.isSuperLike && (
                   <div
-                    className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-superlike text-white flex items-center justify-center shadow-xs"
+                    className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-superlike text-white flex items-center justify-center shadow-xs"
                     title="Super Like orqali match"
                   >
-                    <Star size={10} fill="currentColor" />
+                    <Star size={9} fill="currentColor" />
                   </div>
                 )}
               </div>

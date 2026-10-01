@@ -202,12 +202,12 @@ export default function Chat() {
           </button>
 
           {/* Avatar with live online dot */}
-          <div className="relative w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
+          <div className="relative w-10 h-10 min-w-[40px] max-w-[40px] min-h-[40px] max-h-[40px] rounded-full overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
             {other.photo ? (
               <img
                 src={other.photo}
                 alt={other.displayName}
-                className="w-full h-full object-cover"
+                className="w-10 h-10 object-cover rounded-full shrink-0"
               />
             ) : (
               <span className="font-bold text-gray-400 text-sm">

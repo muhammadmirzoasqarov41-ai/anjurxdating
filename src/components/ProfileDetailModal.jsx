@@ -280,10 +280,10 @@ export default function ProfileDetailModal({
                 onNope(profile);
                 onClose();
               }}
-              className="w-13 h-13 rounded-full bg-white shadow-card flex items-center justify-center text-nope hover:scale-105 active:scale-95 transition-transform border border-gray-100"
+              className="w-12 h-12 rounded-full bg-white shadow-card flex items-center justify-center text-nope hover:scale-105 active:scale-95 transition-transform border border-gray-100"
               title="Yoqmadi"
             >
-              <X size={26} strokeWidth={3} />
+              <X size={24} strokeWidth={3} />
             </button>
           )}
 
@@ -308,10 +308,10 @@ export default function ProfileDetailModal({
                 onLike(profile);
                 onClose();
               }}
-              className="w-13 h-13 rounded-full bg-white shadow-card flex items-center justify-center text-like hover:scale-105 active:scale-95 transition-transform border border-gray-100"
+              className="w-12 h-12 rounded-full bg-white shadow-card flex items-center justify-center text-like hover:scale-105 active:scale-95 transition-transform border border-gray-100"
               title="Yoqdi"
             >
-              <Heart size={26} fill="currentColor" />
+              <Heart size={24} fill="currentColor" />
             </button>
           )}
         </div>
