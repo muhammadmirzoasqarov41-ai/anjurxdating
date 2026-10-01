@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Send, ChevronDown, Flame } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useChatStore } from "../store/chatStore";
@@ -11,20 +11,15 @@ import {
   maybeBotReply,
   updateUserPresence,
 } from "../lib/firestore";
-import { isBotUid } from "../data/bots";
+import { BOTS, isBotUid } from "../data/bots";
+import { getConversationStarters } from "../lib/conversationStarters";
 import ChatBubble from "../components/ChatBubble";
-
-const ICEBREAKERS = [
-  "Salom! 👋",
-  "Qalaysiz? 😊",
-  "Kuningiz qanday o'tyapti?",
-  "Tanishsak bo'ladimi? ✨",
-];
 
 export default function Chat() {
   const { matchId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const { markAsRead } = useChatStore();
 
   const [match, setMatch] = useState(null);
@@ -34,9 +29,19 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
+  const inputRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const bottomRef = useRef(null);
   const isInitialLoadRef = useRef(true);
+
+  // Check if starter query param was passed from Match modal
+  useEffect(() => {
+    const starterParam = searchParams.get("starter");
+    if (starterParam) {
+      setText(starterParam);
+      inputRef.current?.focus();
+    }
+  }, [searchParams]);
 
   // Set user presence as online
   useEffect(() => {
@@ -60,8 +65,13 @@ export default function Chat() {
       setMatch(m);
       if (m && user?.uid) {
         const otherId = m.users.find((u) => u !== user.uid);
-        if (otherId && !isBotUid(otherId)) {
-          getProfile(otherId).then(setOtherProfile);
+        if (otherId) {
+          if (isBotUid(otherId)) {
+            const b = BOTS.find((bot) => bot.uid === otherId);
+            if (b) setOtherProfile(b);
+          } else {
+            getProfile(otherId).then(setOtherProfile);
+          }
         }
       }
     });
@@ -89,6 +99,16 @@ export default function Chat() {
       unsub();
     };
   }, [matchId, user?.uid, markAsRead]);
+
+  // Generate personalized conversation starters
+  const otherUid = match?.users?.find((u) => u !== user?.uid);
+  const other = match?.profiles?.[otherUid] || {};
+  const isBot = isBotUid(otherUid);
+  const isOnline = isBot || Boolean(otherProfile?.online);
+
+  const starters = useMemo(() => {
+    return getConversationStarters(profile || {}, otherProfile || other);
+  }, [profile, otherProfile, other]);
 
   // Scroll to bottom helper
   const scrollToBottom = useCallback((smooth = true) => {
@@ -139,29 +159,8 @@ export default function Chat() {
     }
   };
 
-  if (!match) {
-    return (
-      <div className="flex flex-col h-screen bg-white">
-        <header className="flex items-center gap-3 px-4 h-14 border-b border-gray-100 animate-pulse">
-          <div className="w-8 h-8 rounded-full bg-gray-200" />
-          <div className="w-28 h-4 rounded bg-gray-200" />
-        </header>
-        <div className="flex-1 p-4 space-y-3">
-          <div className="w-2/3 h-10 rounded-2xl bg-gray-100 animate-pulse" />
-          <div className="w-1/2 h-10 rounded-2xl bg-gray-100 ml-auto animate-pulse" />
-        </div>
-      </div>
-    );
-  }
-
-  const otherUid = match.users.find((u) => u !== user?.uid);
-  const other = match.profiles?.[otherUid] || {};
-  const isBot = isBotUid(otherUid);
-  const isOnline = isBot || Boolean(otherProfile?.online);
-
-  async function handleSend(e) {
-    if (e) e.preventDefault();
-    const value = text.trim();
+  async function sendSpecificMessage(msgText) {
+    const value = msgText?.trim();
     if (!value || sending || !user?.uid) return;
 
     setSending(true);
@@ -183,8 +182,24 @@ export default function Chat() {
     }
   }
 
-  function handleIcebreakerClick(greeting) {
-    setText(greeting);
+  async function handleSend(e) {
+    if (e) e.preventDefault();
+    await sendSpecificMessage(text);
+  }
+
+  if (!match) {
+    return (
+      <div className="flex flex-col h-screen bg-white">
+        <header className="flex items-center gap-3 px-4 h-14 border-b border-gray-100 animate-pulse">
+          <div className="w-8 h-8 rounded-full bg-gray-200" />
+          <div className="w-28 h-4 rounded bg-gray-200" />
+        </header>
+        <div className="flex-1 p-4 space-y-3">
+          <div className="w-2/3 h-10 rounded-2xl bg-gray-100 animate-pulse" />
+          <div className="w-1/2 h-10 rounded-2xl bg-gray-100 ml-auto animate-pulse" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -246,32 +261,68 @@ export default function Chat() {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto thin-scroll px-3 py-4 space-y-2 relative"
       >
-        {/* Empty state & Icebreakers */}
+        {/* Empty state & Smart Conversation Starters */}
         {messages.length === 0 && (
-          <div className="py-8 text-center space-y-3">
+          <div className="py-6 px-1 text-center space-y-4 max-w-sm mx-auto">
             <div className="w-12 h-12 rounded-full flame-bg text-white flex items-center justify-center mx-auto shadow-xs">
               <Flame size={20} fill="currentColor" />
             </div>
+
             <div className="space-y-1">
-              <h3 className="font-bold text-sm text-gray-800">
+              <h3 className="font-bold text-base text-gray-900">
                 Match bo'ldingiz!
               </h3>
-              <p className="text-xs text-gray-400 max-w-xs mx-auto">
-                {other.displayName} bilan suhbatni birinchi bo'lib boshlang.
+              <p className="text-xs text-gray-500">
+                {other.displayName} bilan suhbatni quyidagi mavzulardan birini tanlab boshlang:
               </p>
             </div>
 
-            {/* Icebreaker chips */}
-            <div className="flex flex-wrap items-center justify-center gap-1.5 pt-2 max-w-xs mx-auto">
-              {ICEBREAKERS.map((greeting, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleIcebreakerClick(greeting)}
-                  className="px-3 py-1.5 rounded-full bg-gray-50 hover:bg-rose-50 hover:text-flame-start border border-gray-200 text-xs font-semibold text-gray-700 transition-colors"
+            {/* Smart Starters Cards */}
+            <div className="space-y-2 text-left pt-1">
+              {starters.map((starter) => (
+                <div
+                  key={starter.id}
+                  onClick={() => {
+                    setText(starter.text);
+                    inputRef.current?.focus();
+                  }}
+                  className="p-3 rounded-2xl bg-white hover:bg-gray-50 border border-gray-200/80 shadow-2xs cursor-pointer transition-all hover:border-rose-200 group active:scale-[0.99]"
                 >
-                  {greeting}
-                </button>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        starter.badge === "Umumiy qiziqish"
+                          ? "bg-rose-50 text-flame-start border-rose-100"
+                          : starter.badge === "Profil qiziqishi"
+                          ? "bg-sky-50 text-sky-600 border-sky-100"
+                          : starter.badge === "Umumiy maqsad"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                          : "bg-gray-50 text-gray-600 border-gray-200"
+                      }`}
+                    >
+                      {starter.badge}: {starter.topic}
+                    </span>
+
+                    {/* Quick 1-tap Send button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sendSpecificMessage(starter.text);
+                      }}
+                      disabled={sending}
+                      className="px-2.5 py-1 rounded-full flame-bg text-white text-[11px] font-bold flex items-center gap-1 hover:opacity-90 active:scale-95 transition-all shrink-0 shadow-2xs"
+                      title="To'g'ridan-to'g'ri yuborish"
+                    >
+                      <span>Yuborish</span>
+                      <Send size={10} />
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-gray-800 font-medium leading-snug">
+                    "{starter.text}"
+                  </p>
+                </div>
               ))}
             </div>
           </div>
@@ -308,6 +359,7 @@ export default function Chat() {
         className="flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 bg-white sticky bottom-0 z-20"
       >
         <input
+          ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Xabar yozing..."
