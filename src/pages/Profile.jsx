@@ -14,11 +14,19 @@ import {
   Navigation,
   Lock,
   RefreshCw,
+  UserX,
+  Eye,
+  ShieldAlert,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { isSuperAdminUser } from "../components/AdminRoute";
 import { useLocationStore } from "../store/locationStore";
-import { saveProfile } from "../lib/firestore";
+import {
+  saveProfile,
+  updatePrivacySettings,
+  updateUserPresence,
+} from "../lib/firestore";
+import BlockedUsersModal from "../components/BlockedUsersModal";
 import {
   STANDARD_INTERESTS,
   DATING_INTENTIONS,
@@ -28,6 +36,7 @@ import {
 export default function Profile() {
   const { user, profile, logout, refreshProfile } = useAuthStore();
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const {
@@ -40,6 +49,37 @@ export default function Profile() {
     setShareLocation,
     setShowDistance,
   } = useLocationStore();
+
+  const privacy = profile?.privacy || {};
+  const showOnlineStatus = privacy.showOnlineStatus !== false;
+  const showLastSeen = privacy.showLastSeen !== false;
+
+  const handleToggleOnlinePrivacy = async (checked) => {
+    if (!user) return;
+    try {
+      const updated = { ...(profile?.privacy || {}), showOnlineStatus: checked };
+      await updatePrivacySettings(user.uid, updated);
+      if (!checked) {
+        await updateUserPresence(user.uid, false);
+      } else {
+        await updateUserPresence(user.uid, true);
+      }
+      await refreshProfile();
+    } catch (err) {
+      console.error("Privacy yangilashda xatolik:", err);
+    }
+  };
+
+  const handleToggleLastSeenPrivacy = async (checked) => {
+    if (!user) return;
+    try {
+      const updated = { ...(profile?.privacy || {}), showLastSeen: checked };
+      await updatePrivacySettings(user.uid, updated);
+      await refreshProfile();
+    } catch (err) {
+      console.error("Privacy yangilashda xatolik:", err);
+    }
+  };
 
   // Edit form state
   const [formData, setFormData] = useState({
@@ -185,13 +225,13 @@ export default function Profile() {
             </div>
           )}
 
-          {/* Joylashuv va Maxfiylik (Location & Privacy) */}
-          <div className="mt-5 p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3">
+          {/* Maxfiylik va Xavfsizlik (Privacy & Safety) */}
+          <div className="mt-5 p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <Navigation size={15} className="text-flame-start" />
+                <Shield size={16} className="text-flame-start" />
                 <span className="font-bold text-xs text-gray-800">
-                  Joylashuv va Maxfiylik
+                  Maxfiylik va Xavfsizlik
                 </span>
               </div>
               <span
@@ -214,8 +254,8 @@ export default function Profile() {
               </span>
             </div>
 
-            {/* Toggles */}
-            <div className="space-y-2 pt-1 border-t border-gray-200/60 text-xs">
+            {/* Privacy Toggles */}
+            <div className="space-y-2.5 pt-1 border-t border-gray-200/60 text-xs">
               {/* Joylashuv ruxsati */}
               <label className="flex items-center justify-between cursor-pointer">
                 <div>
@@ -241,7 +281,7 @@ export default function Profile() {
                     Masofani ko'rsatish
                   </span>
                   <span className="text-[10px] text-gray-400">
-                    Boshqa userlarga taxminiy masofani ko'rsatish
+                    Boshqa userlarga taxminiy masofangizni ko'rsatish
                   </span>
                 </div>
                 <input
@@ -251,6 +291,59 @@ export default function Profile() {
                   className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
                 />
               </label>
+
+              {/* Onlayn holatni ko'rsatish */}
+              <label className="flex items-center justify-between cursor-pointer pt-1 border-t border-gray-100">
+                <div>
+                  <span className="font-semibold text-gray-700 block">
+                    Onlayn holatni ko'rsatish
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    Boshqalarga onlayn ekanligingizni ko'rsatish
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showOnlineStatus}
+                  onChange={(e) => handleToggleOnlinePrivacy(e.target.checked)}
+                  className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
+                />
+              </label>
+
+              {/* Oxirgi faollikni ko'rsatish */}
+              <label className="flex items-center justify-between cursor-pointer pt-1 border-t border-gray-100">
+                <div>
+                  <span className="font-semibold text-gray-700 block">
+                    Oxirgi faollikni ko'rsatish
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    Oxirgi kirgan vaqtingizni ko'rsatish
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showLastSeen}
+                  onChange={(e) => handleToggleLastSeenPrivacy(e.target.checked)}
+                  className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
+                />
+              </label>
+            </div>
+
+            {/* Blocked Users Button */}
+            <div className="pt-2 border-t border-gray-200/60">
+              <button
+                type="button"
+                onClick={() => setShowBlockedModal(true)}
+                className="w-full py-2 px-3 rounded-xl bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs flex items-center justify-between transition-colors shadow-2xs"
+              >
+                <span className="flex items-center gap-2">
+                  <UserX size={15} className="text-rose-500" />
+                  <span>Bloklangan foydalanuvchilar</span>
+                </span>
+                <span className="text-[11px] text-gray-400 font-semibold">
+                  Boshqarish →
+                </span>
+              </button>
             </div>
 
             {/* Refresh Location Button */}
@@ -272,7 +365,7 @@ export default function Profile() {
               <Lock size={12} className="text-gray-400 shrink-0 mt-0.5" />
               <span>
                 Aniq koordinatalaringiz yoki ko'cha manzilingiz hech qachon oshkor qilinmaydi.
-                Masofa taxminiy hisoblanadi.
+                Barcha xavfsizlik sozlamalari real vaqtda qo'llaniladi.
               </span>
             </p>
           </div>
@@ -496,6 +589,11 @@ export default function Profile() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Blocked Users Modal */}
+      {showBlockedModal && (
+        <BlockedUsersModal onClose={() => setShowBlockedModal(false)} />
       )}
 
       <p className="text-center text-xs text-gray-400 mt-5 leading-relaxed px-4">

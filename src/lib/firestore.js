@@ -54,7 +54,7 @@ export async function updateUserPresence(uid, online = true) {
   }
 }
 
-// ---------- blocks ----------
+// ---------- blocks & safety ----------
 
 export async function getBlockedIds(uid) {
   try {
@@ -67,11 +67,112 @@ export async function getBlockedIds(uid) {
   }
 }
 
-export async function blockUser(uid, targetUid) {
+export async function blockUser(uid, target) {
+  const targetUid = typeof target === "string" ? target : target.uid;
+  const targetProfile = typeof target === "object" ? target : {};
+
   await setDoc(doc(db, "tinder_blocks", uid, "blocked", targetUid), {
     blockedUid: targetUid,
+    displayName: targetProfile.displayName || "Foydalanuvchi",
+    photo: targetProfile.photos?.[0] || targetProfile.photo || null,
     createdAt: serverTimestamp(),
   });
+
+  // Remove from favorites if saved
+  try {
+    await removeFavorite(uid, targetUid);
+  } catch (err) {}
+
+  // Delete match if exists
+  const matchId = matchIdFor(uid, targetUid);
+  try {
+    await deleteDoc(doc(db, "tinder_matches", matchId));
+  } catch (err) {}
+
+  // Remove like swipe
+  try {
+    await deleteDoc(doc(db, "tinder_swipes", uid, "likes", targetUid));
+  } catch (err) {}
+}
+
+export async function unblockUser(uid, targetUid) {
+  await deleteDoc(doc(db, "tinder_blocks", uid, "blocked", targetUid));
+}
+
+export async function getBlockedUsers(uid) {
+  try {
+    const q = query(
+      collection(db, "tinder_blocks", uid, "blocked"),
+      orderBy("createdAt", "desc")
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    const snap = await getDocs(collection(db, "tinder_blocks", uid, "blocked"));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+}
+
+export async function isUserBlockedEitherWay(myUid, otherUid) {
+  if (!myUid || !otherUid) return false;
+  try {
+    const [myBlock, otherBlock] = await Promise.all([
+      getDoc(doc(db, "tinder_blocks", myUid, "blocked", otherUid)),
+      getDoc(doc(db, "tinder_blocks", otherUid, "blocked", myUid)).catch(() => ({ exists: () => false })),
+    ]);
+    return myBlock.exists() || (otherBlock?.exists && otherBlock.exists());
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function unmatchUsers(myUid, targetUid, matchId) {
+  if (!matchId) return;
+  // 1. Delete match document
+  await deleteDoc(doc(db, "tinder_matches", matchId));
+
+  // 2. Remove swipe like records
+  try {
+    await deleteDoc(doc(db, "tinder_swipes", myUid, "likes", targetUid));
+  } catch (err) {}
+}
+
+// Reports
+export async function createReport({
+  reporterUid,
+  reporterName,
+  reportedUid,
+  reportedName,
+  reason,
+  description = "",
+  source = "profile",
+}) {
+  const docRef = await addDoc(collection(db, "reports"), {
+    reporterUid,
+    reporterId: reporterUid,
+    reporterName: reporterName || "Foydalanuvchi",
+    reportedUid,
+    reportedUserId: reportedUid,
+    reportedUserName: reportedName || "Foydalanuvchi",
+    reason: reason || "Boshqa",
+    description: (description || "").trim(),
+    source: source || "profile",
+    status: "pending",
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+// Privacy Settings
+export async function updatePrivacySettings(uid, privacySettings) {
+  await setDoc(
+    doc(db, "tinder_profiles", uid),
+    {
+      privacy: privacySettings,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
 }
 
 // ---------- favorites ----------

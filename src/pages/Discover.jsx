@@ -290,6 +290,12 @@ export default function Discover() {
             onNope={(target) => swipe(me, "nope", target)}
             onToggleFavorite={(target) => toggleFavorite(user?.uid, target)}
             isFavorited={Boolean(favoriteIds.has(selectedProfile.uid))}
+            onBlocked={(target) => {
+              setSelectedProfile(null);
+              if (currentCard?.uid === target?.uid) {
+                swipe(me, "nope", target);
+              }
+            }}
           />
         )}
       </AnimatePresence>

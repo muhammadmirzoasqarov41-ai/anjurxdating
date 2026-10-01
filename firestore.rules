@@ -82,7 +82,8 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) || isSuperAdmin();
 
       match /blocked/{targetId} {
-        allow read, write: if isOwner(userId) || isSuperAdmin();
+        allow read: if isOwner(userId) || (isAuthenticated() && request.auth.uid == targetId) || isSuperAdmin();
+        allow write: if isOwner(userId) || isSuperAdmin();
       }
     }
 
@@ -91,7 +92,7 @@ service cloud.firestore {
       allow read: if (isAuthenticated() && request.auth.uid in resource.data.users) || isAdminOrSuperAdmin();
       allow create: if isAuthenticated() || isAdminOrSuperAdmin();
       allow update: if (isAuthenticated() && request.auth.uid in resource.data.users) || isAdminOrSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow delete: if (isAuthenticated() && request.auth.uid in resource.data.users) || isSuperAdmin();
 
       match /messages/{messageId} {
         allow read, create: if isAuthenticated() || isAdminOrSuperAdmin();
@@ -102,7 +103,7 @@ service cloud.firestore {
 
     // Reports: normal users can submit reports, admins can read/moderate
     match /reports/{reportId} {
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.reporterUid || request.auth.uid == request.resource.data.reporterId);
       allow read, update: if isAdminOrSuperAdmin();
       allow delete: if isSuperAdmin();
     }

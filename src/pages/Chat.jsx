@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Send, ChevronDown, Flame } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  ChevronDown,
+  Flame,
+  MoreVertical,
+  ShieldAlert,
+  UserX,
+  HeartOff,
+} from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useChatStore } from "../store/chatStore";
 import {
@@ -10,10 +19,16 @@ import {
   sendMessage,
   maybeBotReply,
   updateUserPresence,
+  getBlockedIds,
+  isUserBlockedEitherWay,
+  unblockUser,
 } from "../lib/firestore";
 import { BOTS, isBotUid } from "../data/bots";
 import { getConversationStarters } from "../lib/conversationStarters";
 import ChatBubble from "../components/ChatBubble";
+import ReportModal from "../components/ReportModal";
+import BlockModal from "../components/BlockModal";
+import UnmatchModal from "../components/UnmatchModal";
 
 export default function Chat() {
   const { matchId } = useParams();
@@ -28,6 +43,14 @@ export default function Chat() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  // Safety & Moderation state
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showUnmatchModal, setShowUnmatchModal] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockedByMe, setBlockedByMe] = useState(false);
 
   const inputRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -72,6 +95,14 @@ export default function Chat() {
           } else {
             getProfile(otherId).then(setOtherProfile);
           }
+
+          // Check block status
+          isUserBlockedEitherWay(user.uid, otherId).then((blocked) => {
+            setIsBlocked(blocked);
+          });
+          getBlockedIds(user.uid).then((ids) => {
+            setBlockedByMe(ids.has(otherId));
+          });
         }
       }
     });
@@ -160,6 +191,7 @@ export default function Chat() {
   };
 
   async function sendSpecificMessage(msgText) {
+    if (isBlocked) return;
     const value = msgText?.trim();
     if (!value || sending || !user?.uid) return;
 
@@ -186,6 +218,17 @@ export default function Chat() {
     if (e) e.preventDefault();
     await sendSpecificMessage(text);
   }
+
+  const handleUnblock = async () => {
+    if (!user?.uid || !otherUid) return;
+    try {
+      await unblockUser(user.uid, otherUid);
+      setIsBlocked(false);
+      setBlockedByMe(false);
+    } catch (err) {
+      console.error("Blokdan chiqarishda xatolik:", err);
+    }
+  };
 
   if (!match) {
     return (
@@ -253,6 +296,55 @@ export default function Chat() {
             </p>
           </div>
         </div>
+
+        {/* Options / Safety dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-colors"
+            title="Suhbat amallari"
+          >
+            <MoreVertical size={18} />
+          </button>
+
+          {showMenu && (
+            <div className="absolute right-0 top-10 w-48 bg-white rounded-2xl shadow-card border border-gray-100 py-1.5 z-40 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowUnmatchModal(true);
+                }}
+                className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-semibold transition-colors"
+              >
+                <HeartOff size={14} className="text-amber-500" />
+                <span>Matchni bekor qilish</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowReportModal(true);
+                }}
+                className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-semibold border-t border-gray-100 transition-colors"
+              >
+                <ShieldAlert size={14} className="text-amber-500" />
+                <span>Shikoyat qilish</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowBlockModal(true);
+                }}
+                className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-rose-600 font-semibold border-t border-gray-100 transition-colors"
+              >
+                <UserX size={14} className="text-rose-500" />
+                <span>Bloklash</span>
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Messages Scroll Area */}
@@ -283,10 +375,15 @@ export default function Chat() {
                 <div
                   key={starter.id}
                   onClick={() => {
+                    if (isBlocked) return;
                     setText(starter.text);
                     inputRef.current?.focus();
                   }}
-                  className="p-3 rounded-2xl bg-white hover:bg-gray-50 border border-gray-200/80 shadow-2xs cursor-pointer transition-all hover:border-rose-200 group active:scale-[0.99]"
+                  className={`p-3 rounded-2xl bg-white border border-gray-200/80 shadow-2xs transition-all ${
+                    isBlocked
+                      ? "opacity-60 cursor-not-allowed"
+                      : "hover:bg-gray-50 cursor-pointer hover:border-rose-200 active:scale-[0.99]"
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <span
@@ -304,19 +401,21 @@ export default function Chat() {
                     </span>
 
                     {/* Quick 1-tap Send button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendSpecificMessage(starter.text);
-                      }}
-                      disabled={sending}
-                      className="px-2.5 py-1 rounded-full flame-bg text-white text-[11px] font-bold flex items-center gap-1 hover:opacity-90 active:scale-95 transition-all shrink-0 shadow-2xs"
-                      title="To'g'ridan-to'g'ri yuborish"
-                    >
-                      <span>Yuborish</span>
-                      <Send size={10} />
-                    </button>
+                    {!isBlocked && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sendSpecificMessage(starter.text);
+                        }}
+                        disabled={sending}
+                        className="px-2.5 py-1 rounded-full flame-bg text-white text-[11px] font-bold flex items-center gap-1 hover:opacity-90 active:scale-95 transition-all shrink-0 shadow-2xs"
+                        title="To'g'ridan-to'g'ri yuborish"
+                      >
+                        <span>Yuborish</span>
+                        <Send size={10} />
+                      </button>
+                    )}
                   </div>
 
                   <p className="text-xs text-gray-800 font-medium leading-snug">
@@ -353,28 +452,83 @@ export default function Chat() {
         </button>
       )}
 
-      {/* Input Form */}
-      <form
-        onSubmit={handleSend}
-        className="flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 bg-white sticky bottom-0 z-20"
-      >
-        <input
-          ref={inputRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Xabar yozing..."
-          disabled={sending}
-          className="flex-1 px-4 py-2.5 rounded-full bg-gray-100 outline-none text-sm text-gray-800 placeholder-gray-400 focus:ring-1 focus:ring-flame-start"
-        />
-        <button
-          type="submit"
-          disabled={!text.trim() || sending}
-          className="w-10 h-10 rounded-full flame-bg text-white flex items-center justify-center disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all shadow-xs shrink-0"
-          title="Yuborish"
+      {/* Input Form or Blocked Notice */}
+      {isBlocked ? (
+        <div className="p-3 bg-gray-50 border-t border-gray-200 text-center">
+          <p className="text-xs font-semibold text-gray-600 mb-1">
+            Ushbu foydalanuvchi bloklangan. Yangi xabar yozib bo'lmaydi.
+          </p>
+          {blockedByMe ? (
+            <button
+              type="button"
+              onClick={handleUnblock}
+              className="text-xs font-bold text-flame-start hover:underline"
+            >
+              Blokdan chiqarish
+            </button>
+          ) : (
+            <p className="text-[11px] text-gray-400">
+              Suhbat mavjud emas
+            </p>
+          )}
+        </div>
+      ) : (
+        <form
+          onSubmit={handleSend}
+          className="flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 bg-white sticky bottom-0 z-20"
         >
-          <Send size={17} />
-        </button>
-      </form>
+          <input
+            ref={inputRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Xabar yozing..."
+            disabled={sending}
+            className="flex-1 px-4 py-2.5 rounded-full bg-gray-100 outline-none text-sm text-gray-800 placeholder-gray-400 focus:ring-1 focus:ring-flame-start"
+          />
+          <button
+            type="submit"
+            disabled={!text.trim() || sending}
+            className="w-10 h-10 rounded-full flame-bg text-white flex items-center justify-center disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all shadow-xs shrink-0"
+            title="Yuborish"
+          >
+            <Send size={17} />
+          </button>
+        </form>
+      )}
+
+      {/* Safety Modals */}
+      {showReportModal && (
+        <ReportModal
+          target={{ uid: otherUid, displayName: other.displayName }}
+          source="chat"
+          onClose={() => setShowReportModal(false)}
+          onBlockRequested={() => {
+            setShowBlockModal(true);
+          }}
+        />
+      )}
+
+      {showBlockModal && (
+        <BlockModal
+          target={{ uid: otherUid, displayName: other.displayName, photos: other.photo ? [other.photo] : [] }}
+          onClose={() => setShowBlockModal(false)}
+          onBlocked={() => {
+            setIsBlocked(true);
+            setBlockedByMe(true);
+          }}
+        />
+      )}
+
+      {showUnmatchModal && (
+        <UnmatchModal
+          target={{ uid: otherUid, displayName: other.displayName }}
+          matchId={matchId}
+          onClose={() => setShowUnmatchModal(false)}
+          onUnmatched={() => {
+            navigate("/matches");
+          }}
+        />
+      )}
     </div>
   );
 }
