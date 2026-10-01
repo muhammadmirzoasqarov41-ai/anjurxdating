@@ -136,7 +136,6 @@ export default function Onboarding() {
         city: "Toshkent",
         datingIntention: "Do'stlik va muloqot",
         interests: ["Qahva", "Kino", "Musiqa"],
-        distanceKm: Math.floor(Math.random() * 12) + 2,
         isBot: false,
       });
 

@@ -9,6 +9,7 @@ import {
   Star,
   Bookmark,
 } from "lucide-react";
+import { formatDistance } from "../lib/location";
 
 // Drag-and-swipe card with strict stacking context isolation.
 // Supports: Drag Left (Nope), Drag Right (Like), Drag Up (Super Like), Favorite toggle & Detail modal.
@@ -240,11 +241,15 @@ export default function SwipeCard({
                 <MapPin size={14} /> {profile.city}
               </span>
             )}
-            {typeof profile.distanceKm === "number" && (
+            {typeof profile.realDistanceKm === "number" ? (
               <span className="flex items-center gap-1">
-                <MapPin size={14} /> {profile.distanceKm} km
+                <MapPin size={14} /> {formatDistance(profile.realDistanceKm)}
               </span>
-            )}
+            ) : !profile.city ? (
+              <span className="flex items-center gap-1 text-white/70 text-xs">
+                <MapPin size={13} /> Joylashuv noaniq
+              </span>
+            ) : null}
           </div>
 
           {profile.bio && (

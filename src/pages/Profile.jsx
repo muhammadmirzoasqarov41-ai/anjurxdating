@@ -11,9 +11,13 @@ import {
   X,
   Check,
   Sliders,
+  Navigation,
+  Lock,
+  RefreshCw,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { isSuperAdminUser } from "../components/AdminRoute";
+import { useLocationStore } from "../store/locationStore";
 import { saveProfile } from "../lib/firestore";
 import {
   STANDARD_INTERESTS,
@@ -25,6 +29,17 @@ export default function Profile() {
   const { user, profile, logout, refreshProfile } = useAuthStore();
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const {
+    currentLocation,
+    permissionStatus,
+    shareLocation,
+    showDistance,
+    loading: locationLoading,
+    requestLocation,
+    setShareLocation,
+    setShowDistance,
+  } = useLocationStore();
 
   // Edit form state
   const [formData, setFormData] = useState({
@@ -169,6 +184,98 @@ export default function Profile() {
               </div>
             </div>
           )}
+
+          {/* Joylashuv va Maxfiylik (Location & Privacy) */}
+          <div className="mt-5 p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Navigation size={15} className="text-flame-start" />
+                <span className="font-bold text-xs text-gray-800">
+                  Joylashuv va Maxfiylik
+                </span>
+              </div>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
+                  permissionStatus === "granted" && currentLocation
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    permissionStatus === "granted" && currentLocation
+                      ? "bg-emerald-500"
+                      : "bg-amber-500"
+                  }`}
+                />
+                {permissionStatus === "granted" && currentLocation
+                  ? (currentLocation.city || "Joylashuv faol")
+                  : "Aniqlanmagan"}
+              </span>
+            </div>
+
+            {/* Toggles */}
+            <div className="space-y-2 pt-1 border-t border-gray-200/60 text-xs">
+              {/* Joylashuv ruxsati */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <span className="font-semibold text-gray-700 block">
+                    Joylashuvdan foydalanish
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    Yaqin atrofdagi profillarni topish uchun
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={shareLocation}
+                  onChange={(e) => setShareLocation(user?.uid, e.target.checked)}
+                  className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
+                />
+              </label>
+
+              {/* Masofani ko'rsatish */}
+              <label className="flex items-center justify-between cursor-pointer pt-1 border-t border-gray-100">
+                <div>
+                  <span className="font-semibold text-gray-700 block">
+                    Masofani ko'rsatish
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    Boshqa userlarga taxminiy masofani ko'rsatish
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showDistance}
+                  onChange={(e) => setShowDistance(user?.uid, e.target.checked)}
+                  className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
+                />
+              </label>
+            </div>
+
+            {/* Refresh Location Button */}
+            <button
+              type="button"
+              onClick={() => user && requestLocation(user.uid, true)}
+              disabled={locationLoading}
+              className="w-full py-1.5 rounded-xl bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <RefreshCw
+                size={12}
+                className={locationLoading ? "animate-spin text-flame-start" : ""}
+              />
+              <span>{locationLoading ? "Aniqlanmoqda..." : "Joylashuvni yangilash"}</span>
+            </button>
+
+            {/* Privacy Notice */}
+            <p className="flex items-start gap-1.5 text-[10px] text-gray-400 leading-tight pt-1">
+              <Lock size={12} className="text-gray-400 shrink-0 mt-0.5" />
+              <span>
+                Aniq koordinatalaringiz yoki ko'cha manzilingiz hech qachon oshkor qilinmaydi.
+                Masofa taxminiy hisoblanadi.
+              </span>
+            </p>
+          </div>
 
           {/* Tahrirlash tugmasi */}
           <button

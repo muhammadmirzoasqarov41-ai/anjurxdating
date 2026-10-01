@@ -8,10 +8,12 @@ import {
   Heart,
   X,
   Compass,
+  MapPin,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useDeckStore } from "../store/deckStore";
 import { useFavoritesStore } from "../store/favoritesStore";
+import { useLocationStore } from "../store/locationStore";
 import SwipeCard from "../components/SwipeCard";
 import ActionButtons from "../components/ActionButtons";
 import MatchModal from "../components/MatchModal";
@@ -24,10 +26,32 @@ export default function Discover() {
   const { cards, index, loading, error, lastMatch, load, swipe, clearMatch } =
     useDeckStore();
   const { favoriteIds, toggleFavorite, loadFavorites } = useFavoritesStore();
+  const {
+    currentLocation,
+    permissionStatus,
+    shareLocation,
+    loading: locationLoading,
+    requestLocation,
+    initFromProfile,
+  } = useLocationStore();
 
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState(profile?.preferences || {});
+
+  // Initialize location store with saved profile settings
+  useEffect(() => {
+    if (profile) {
+      initFromProfile(profile);
+    }
+  }, [profile, initFromProfile]);
+
+  // Request location automatically once on mount if sharing is enabled
+  useEffect(() => {
+    if (user?.uid && shareLocation) {
+      requestLocation(user.uid);
+    }
+  }, [user?.uid, shareLocation, requestLocation]);
 
   // Load favorites on mount
   useEffect(() => {
@@ -36,14 +60,26 @@ export default function Discover() {
     }
   }, [user?.uid, loadFavorites]);
 
-  // Load deck with user profile for Smart Matching and active filters
+  // Build current user representation including live approx coordinates
+  const me = useMemo(() => {
+    return {
+      uid: user?.uid,
+      ...profile,
+      approxLocation: currentLocation || profile?.approxLocation || null,
+      city: currentLocation?.city || profile?.city || "Toshkent",
+      locationSettings: {
+        shareLocation,
+        showDistance: profile?.locationSettings?.showDistance !== false,
+      },
+    };
+  }, [user, profile, currentLocation, shareLocation]);
+
+  // Load deck with user profile for Smart Matching, real distance, and active filters
   useEffect(() => {
     if (user) {
-      load(user.uid, profile || {}, activeFilters);
+      load(user.uid, me, activeFilters);
     }
-  }, [user, profile, activeFilters, load]);
-
-  const me = useMemo(() => ({ uid: user?.uid, ...profile }), [user, profile]);
+  }, [user, me, activeFilters, load]);
 
   const remaining = cards.slice(index);
   const noMore = !loading && remaining.length === 0;
@@ -57,6 +93,7 @@ export default function Discover() {
     if (activeFilters.gender && activeFilters.gender !== "all") count++;
     if (activeFilters.datingIntention && activeFilters.datingIntention !== "all") count++;
     if (activeFilters.city && activeFilters.city !== "all") count++;
+    if (activeFilters.maxDistance) count++;
     if (activeFilters.interest && activeFilters.interest !== "all") count++;
     if (activeFilters.language && activeFilters.language !== "all") count++;
     if (activeFilters.verifiedOnly) count++;
@@ -83,15 +120,35 @@ export default function Discover() {
           <span className="flex items-center gap-1 text-xs font-bold text-gray-800">
             <Flame size={14} className="text-flame-start" fill="currentColor" /> Smart Discover
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-flame-start font-bold border border-orange-100">
-            2.0
-          </span>
+
+          {/* Location Status Pill */}
+          {permissionStatus === "granted" && currentLocation ? (
+            <button
+              onClick={() => requestLocation(user?.uid, true)}
+              disabled={locationLoading}
+              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
+              title="Joylashuv faol. Qayta aniqlash uchun bosing"
+            >
+              <MapPin size={10} className="text-emerald-500" />
+              <span>{currentLocation.city || "Joylashuv faol"}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => requestLocation(user?.uid, true)}
+              disabled={locationLoading}
+              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-100 hover:bg-amber-100 transition-colors"
+              title="Aniq masofani hisoblash uchun bosing"
+            >
+              <MapPin size={10} className="text-amber-500" />
+              <span>{locationLoading ? "Aniqlanmoqda..." : "Joylashuvni yoqish"}</span>
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
           {/* Refresh deck */}
           <button
-            onClick={() => user && load(user.uid, profile || {}, activeFilters)}
+            onClick={() => user && load(user.uid, me, activeFilters)}
             disabled={loading}
             className="w-8 h-8 rounded-full bg-white hover:bg-gray-100 text-gray-500 shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50"
             title="Qayta yuklash"
@@ -145,7 +202,7 @@ export default function Discover() {
             </h3>
             <p className="text-xs text-gray-500 max-w-xs">{error}</p>
             <button
-              onClick={() => user && load(user.uid, profile || {}, activeFilters)}
+              onClick={() => user && load(user.uid, me, activeFilters)}
               className="mt-2 px-4 py-2 rounded-full flame-bg text-white text-xs font-bold hover:opacity-90 transition-opacity"
             >
               Qayta urinish
@@ -178,7 +235,7 @@ export default function Discover() {
                 </button>
               )}
               <button
-                onClick={() => user && load(user.uid, profile || {}, activeFilters)}
+                onClick={() => user && load(user.uid, me, activeFilters)}
                 className="px-4 py-2 rounded-full flame-bg text-white text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5"
               >
                 <RefreshCw size={13} /> Qayta yuklash

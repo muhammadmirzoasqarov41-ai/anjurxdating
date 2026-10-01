@@ -5,10 +5,13 @@
  * - Mutual interests (overlap)
  * - Dating intention (goal alignment)
  * - Age preference & compatibility
+ * - Real geographic distance (Haversine formula & coarse privacy grid)
  * - City / Location proximity
  * - Languages matching
  * - Profile completeness & verification
  */
+
+import { calculateProfileDistance, formatDistance } from "./location";
 
 export const STANDARD_INTERESTS = [
   "Qahva",
@@ -60,7 +63,7 @@ export const STANDARD_LANGUAGES = [
 
 /**
  * Calculates a deterministic compatibility score between current user and candidate profile.
- * No random numbers! Same two profiles will always produce the exact same score.
+ * Incorporates real calculated geographic distance.
  */
 export function calculateCompatibility(me = {}, target = {}) {
   let score = 55; // Base baseline score
@@ -95,19 +98,24 @@ export function calculateCompatibility(me = {}, target = {}) {
     }
   }
 
-  // 3. Location / City Compatibility (up to +10%)
+  // 3. Real Location / Distance Compatibility (up to +12%)
+  const realDistanceKm = calculateProfileDistance(me, target);
   const myCity = (me?.city || "").trim().toLowerCase();
   const targetCity = (target?.city || "").trim().toLowerCase();
 
-  if (myCity && targetCity && myCity === targetCity) {
-    score += 10;
-    matchReasons.push(`Bir xil hudud: ${target.city}`);
-  } else if (
-    typeof target?.distanceKm === "number" &&
-    target.distanceKm <= 15
-  ) {
-    score += 6;
-    matchReasons.push(`Yaqin masofada (${target.distanceKm} km)`);
+  if (typeof realDistanceKm === "number") {
+    if (realDistanceKm <= 10) {
+      score += 12;
+      matchReasons.push(`Yaqin masofada (${formatDistance(realDistanceKm)})`);
+    } else if (realDistanceKm <= 25) {
+      score += 8;
+      matchReasons.push(`Bir hududda (${formatDistance(realDistanceKm)})`);
+    } else if (realDistanceKm <= 60) {
+      score += 4;
+    }
+  } else if (myCity && targetCity && myCity === targetCity) {
+    score += 8;
+    matchReasons.push(`Bir xil shahar: ${target.city}`);
   }
 
   // 4. Age compatibility & preference (up to +10%)
@@ -159,6 +167,7 @@ export function calculateCompatibility(me = {}, target = {}) {
     score,
     mutualInterests,
     matchReasons,
+    realDistanceKm,
   };
 }
 
@@ -185,6 +194,10 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
   const newOnly = Boolean(filters?.newOnly);
 
   for (const card of rawCards) {
+    // Calculate real distance using real location / coordinates
+    const realDistanceKm = calculateProfileDistance(me, card);
+    card.realDistanceKm = realDistanceKm;
+
     // 1. Filter: Age
     if (card.age) {
       if (minAge && card.age < minAge) continue;
@@ -213,9 +226,17 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
       }
     }
 
-    // 5. Filter: Distance
-    if (maxDistance && typeof card.distanceKm === "number") {
-      if (card.distanceKm > maxDistance) continue;
+    // 5. Filter: Real Distance in km
+    if (maxDistance) {
+      if (typeof card.realDistanceKm === "number") {
+        if (card.realDistanceKm > maxDistance) continue;
+      } else {
+        // If candidate has no location, but user filtered by distance:
+        // if user has city and card has different city, skip
+        if (me?.city && card.city && me.city.toLowerCase() !== card.city.toLowerCase()) {
+          continue;
+        }
+      }
     }
 
     // 6. Filter: Specific Interest
@@ -248,26 +269,26 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
 
     // 10. Filter: New profile only
     if (newOnly && !card.isNew) {
-      // If created in last 14 days or explicitly flagged as isNew
       const createdAtMs = card.createdAt?.toMillis ? card.createdAt.toMillis() : null;
       const isRecent = createdAtMs && Date.now() - createdAtMs < 14 * 86400 * 1000;
       if (!isRecent) continue;
     }
 
-    // Calculate real compatibility
+    // Calculate real compatibility (incorporating real distance)
     const compatibility = calculateCompatibility(me, card);
 
     result.push({
       ...card,
       compatibility,
+      realDistanceKm,
     });
   }
 
   // Smart Sorting:
   // 1. Higher compatibility score
   // 2. More common interests
-  // 3. Verified profiles boost
-  // 4. Closer distance
+  // 3. Closer real distance
+  // 4. Verified profiles boost
   // 5. Online/active profiles
   result.sort((a, b) => {
     const scoreDiff = (b.compatibility?.score || 50) - (a.compatibility?.score || 50);
@@ -278,13 +299,13 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
       (a.compatibility?.mutualInterests?.length || 0);
     if (mutualDiff !== 0) return mutualDiff;
 
+    const distA = typeof a.realDistanceKm === "number" ? a.realDistanceKm : 9999;
+    const distB = typeof b.realDistanceKm === "number" ? b.realDistanceKm : 9999;
+    if (distA !== distB) return distA - distB;
+
     const verifiedA = a.verified || a.isVerified ? 1 : 0;
     const verifiedB = b.verified || b.isVerified ? 1 : 0;
     if (verifiedB !== verifiedA) return verifiedB - verifiedA;
-
-    const distA = typeof a.distanceKm === "number" ? a.distanceKm : 999;
-    const distB = typeof b.distanceKm === "number" ? b.distanceKm : 999;
-    if (distA !== distB) return distA - distB;
 
     const onlineA = a.online || a.isOnline ? 1 : 0;
     const onlineB = b.online || b.isOnline ? 1 : 0;

@@ -9,6 +9,8 @@ import {
   Activity,
   Flame,
   Languages,
+  MapPin,
+  Navigation,
 } from "lucide-react";
 import {
   STANDARD_INTERESTS,
@@ -16,12 +18,22 @@ import {
   CITIES,
   STANDARD_LANGUAGES,
 } from "../lib/matching";
+import { useLocationStore } from "../store/locationStore";
+import { useAuthStore } from "../store/authStore";
 
 export default function DiscoverFiltersModal({
   currentFilters = {},
   onClose,
   onApply,
 }) {
+  const { user } = useAuthStore();
+  const {
+    currentLocation,
+    permissionStatus,
+    requestLocation,
+    loading: locationLoading,
+  } = useLocationStore();
+
   const [minAge, setMinAge] = useState(currentFilters.minAge || 18);
   const [maxAge, setMaxAge] = useState(currentFilters.maxAge || 45);
   const [gender, setGender] = useState(currentFilters.gender || "all");
@@ -29,6 +41,9 @@ export default function DiscoverFiltersModal({
     currentFilters.datingIntention || "all"
   );
   const [city, setCity] = useState(currentFilters.city || "all");
+  const [maxDistance, setMaxDistance] = useState(
+    currentFilters.maxDistance || 0
+  );
   const [selectedInterest, setSelectedInterest] = useState(
     currentFilters.interest || "all"
   );
@@ -47,6 +62,7 @@ export default function DiscoverFiltersModal({
     setGender("all");
     setDatingIntention("all");
     setCity("all");
+    setMaxDistance(0);
     setSelectedInterest("all");
     setLanguage("all");
     setVerifiedOnly(false);
@@ -61,6 +77,7 @@ export default function DiscoverFiltersModal({
       gender,
       datingIntention,
       city,
+      maxDistance: Number(maxDistance) || null,
       interest: selectedInterest,
       language,
       verifiedOnly,
@@ -76,11 +93,14 @@ export default function DiscoverFiltersModal({
   if (gender !== "all") activeCount++;
   if (datingIntention !== "all") activeCount++;
   if (city !== "all") activeCount++;
+  if (maxDistance > 0) activeCount++;
   if (selectedInterest !== "all") activeCount++;
   if (language !== "all") activeCount++;
   if (verifiedOnly) activeCount++;
   if (onlineOnly) activeCount++;
   if (newOnly) activeCount++;
+
+  const hasLocation = permissionStatus === "granted" && currentLocation;
 
   return (
     <motion.div
@@ -123,6 +143,61 @@ export default function DiscoverFiltersModal({
 
         {/* Body */}
         <div className="p-5 space-y-4 overflow-y-auto thin-scroll text-xs">
+          {/* Real Distance Filter */}
+          <div className="space-y-2 p-3 rounded-2xl bg-gray-50 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-gray-800 flex items-center gap-1.5">
+                <MapPin size={14} className="text-flame-start" /> Maksimal Masofa
+              </label>
+              <span className="font-bold text-flame-start">
+                {maxDistance > 0 ? `${maxDistance} km gacha` : "Istalgan masofa"}
+              </span>
+            </div>
+
+            {/* Distance Options */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
+              {[
+                { val: 0, label: "Istalgan" },
+                { val: 5, label: "5 km" },
+                { val: 10, label: "10 km" },
+                { val: 25, label: "25 km" },
+                { val: 50, label: "50 km" },
+                { val: 100, label: "100 km" },
+              ].map((opt) => (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => setMaxDistance(opt.val)}
+                  className={`py-1.5 rounded-xl font-bold transition-all text-xs border ${
+                    maxDistance === opt.val
+                      ? "flame-bg text-white border-transparent shadow-2xs"
+                      : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Location Permission Notice if not granted */}
+            {!hasLocation && (
+              <div className="mt-2 p-2 rounded-xl bg-amber-50/80 border border-amber-200/60 flex items-center justify-between gap-2 text-[11px] text-amber-800">
+                <div className="flex items-center gap-1.5">
+                  <Navigation size={13} className="text-amber-600 shrink-0" />
+                  <span>Masofa filtri aniq ishlashi uchun joylashuv ruxsati kerak</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => user && requestLocation(user.uid, true)}
+                  disabled={locationLoading}
+                  className="px-2 py-0.5 rounded-full bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold shrink-0 transition-colors"
+                >
+                  {locationLoading ? "..." : "Ruxsat"}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Yosh Oralig'i */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">

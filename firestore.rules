@@ -40,6 +40,11 @@ service cloud.firestore {
       allow write: if isOwner(userId) || isSuperAdmin();
     }
 
+    // Private locations: exact coordinates are strictly private to the user
+    match /user_locations/{userId} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+
     // Profiles: users can read profiles for the swipe deck, only owner can edit their own
     match /tinder_profiles/{userId} {
       allow read: if isAuthenticated();
@@ -90,7 +95,8 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read, create: if isAuthenticated() || isAdminOrSuperAdmin();
-        allow update, delete: if isSuperAdmin();
+        allow update: if isAuthenticated() || isAdminOrSuperAdmin();
+        allow delete: if isSuperAdmin();
       }
     }
 

@@ -17,8 +17,7 @@ import { db } from "./firebase";
 import { BOTS, BOT_REPLIES, isBotUid } from "../data/bots";
 import { filterAndSortDeck } from "./matching";
 
-// helper: id de match deterministico a partir de dos uid ordenados, asi no
-// importa quien dio like primero, siempre apuntamos al mismo documento.
+// helper: deterministic matchId from two sorted UIDs
 export function matchIdFor(a, b) {
   return [a, b].sort().join("_");
 }
@@ -36,6 +35,23 @@ export async function saveProfile(uid, data) {
     { ...data, uid, updatedAt: serverTimestamp() },
     { merge: true }
   );
+}
+
+// User Presence tracking
+export async function updateUserPresence(uid, online = true) {
+  if (!uid) return;
+  try {
+    await setDoc(
+      doc(db, "tinder_profiles", uid),
+      {
+        online,
+        lastSeenAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    // Ignore error silently
+  }
 }
 
 // ---------- blocks ----------
@@ -208,8 +224,6 @@ async function createMatch(me, target, isSuperLike = false) {
     doc(db, "tinder_matches", id),
     {
       users: [me.uid, target.uid],
-      // guardo una vista minima de cada perfil para pintar la lista sin
-      // tener que leer cada perfil por separado
       profiles: {
         [me.uid]: {
           displayName: me.displayName,
@@ -226,6 +240,8 @@ async function createMatch(me, target, isSuperLike = false) {
       createdAt: serverTimestamp(),
       lastMessage: null,
       lastMessageAt: serverTimestamp(),
+      lastSenderUid: null,
+      unreadBy: [],
     },
     { merge: true }
   );
@@ -240,9 +256,50 @@ export async function getMatches(uid) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+// Real-time listener for current user's matches and unread status
+export function listenUserMatches(uid, cb) {
+  if (!uid) return () => {};
+  const q = query(
+    collection(db, "tinder_matches"),
+    where("users", "array-contains", uid)
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => {
+        const ta = a.lastMessageAt?.toMillis
+          ? a.lastMessageAt.toMillis()
+          : a.createdAt?.toMillis
+          ? a.createdAt.toMillis()
+          : 0;
+        const tb = b.lastMessageAt?.toMillis
+          ? b.lastMessageAt.toMillis()
+          : b.createdAt?.toMillis
+          ? b.createdAt.toMillis()
+          : 0;
+        return tb - ta;
+      });
+      cb(list);
+    },
+    (err) => {
+      console.warn("listenUserMatches error:", err);
+    }
+  );
+}
+
 export async function getMatch(matchId) {
   const snap = await getDoc(doc(db, "tinder_matches", matchId));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+// Real-time match document listener
+export function listenMatch(matchId, cb) {
+  return onSnapshot(doc(db, "tinder_matches", matchId), (snap) => {
+    if (snap.exists()) {
+      cb({ id: snap.id, ...snap.data() });
+    }
+  });
 }
 
 // ---------- chat ----------
@@ -257,36 +314,137 @@ export function listenMessages(matchId, cb) {
   });
 }
 
-export async function sendMessage(matchId, senderUid, text) {
-  await addDoc(collection(db, "tinder_matches", matchId, "messages"), {
-    senderUid,
-    text,
-    createdAt: serverTimestamp(),
-  });
-  await setDoc(
-    doc(db, "tinder_matches", matchId),
-    { lastMessage: text, lastMessageAt: serverTimestamp() },
-    { merge: true }
+export async function sendMessage(matchId, senderUid, text, receiverUid = null) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const docRef = await addDoc(
+    collection(db, "tinder_matches", matchId, "messages"),
+    {
+      senderUid,
+      receiverUid: receiverUid || null,
+      text: trimmed,
+      read: false,
+      readAt: null,
+      createdAt: serverTimestamp(),
+    }
   );
+
+  const matchUpdate = {
+    lastMessage: trimmed,
+    lastMessageAt: serverTimestamp(),
+    lastSenderUid: senderUid,
+  };
+
+  if (receiverUid) {
+    matchUpdate.unreadBy = [receiverUid];
+  }
+
+  await setDoc(doc(db, "tinder_matches", matchId), matchUpdate, {
+    merge: true,
+  });
+
+  return docRef.id;
 }
 
-// cuando le escribes a un bot, contesta tras un pequeño delay con una de sus
-// frases. cuento cuantos mensajes suyos hay para no repetir desde el inicio.
-export async function maybeBotReply(matchId, botUid, existingBotMessages) {
+// Marks all messages in conversation as read for the current user
+export async function markMatchAsRead(matchId, readerUid) {
+  if (!matchId || !readerUid) return;
+
+  try {
+    // 1. Remove reader from match unreadBy
+    const matchRef = doc(db, "tinder_matches", matchId);
+    const matchSnap = await getDoc(matchRef);
+    if (matchSnap.exists()) {
+      const data = matchSnap.data();
+      const unreadList = Array.isArray(data.unreadBy) ? data.unreadBy : [];
+      if (unreadList.includes(readerUid)) {
+        await setDoc(
+          matchRef,
+          {
+            unreadBy: unreadList.filter((u) => u !== readerUid),
+          },
+          { merge: true }
+        );
+      }
+    }
+
+    // 2. Mark unread messages addressed to reader as read: true
+    const q = query(
+      collection(db, "tinder_matches", matchId, "messages"),
+      where("read", "==", false)
+    );
+    const snap = await getDocs(q);
+    const updates = [];
+    snap.forEach((d) => {
+      const m = d.data();
+      if (m.senderUid !== readerUid) {
+        updates.push(
+          setDoc(
+            doc(db, "tinder_matches", matchId, "messages", d.id),
+            { read: true, readAt: serverTimestamp() },
+            { merge: true }
+          )
+        );
+      }
+    });
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+    }
+  } catch (err) {
+    console.warn("markMatchAsRead error:", err);
+  }
+}
+
+// Bot reply helper
+export async function maybeBotReply(matchId, botUid, existingBotMessages, userUid = null) {
   const replies = BOT_REPLIES[botUid];
   if (!replies) return;
   const next = replies[existingBotMessages % replies.length];
   await new Promise((r) => setTimeout(r, 1200 + Math.random() * 800));
-  await sendMessage(matchId, botUid, next);
+  await sendMessage(matchId, botUid, next, userUid);
 }
 
-// ---------- utils ----------
-
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+// Format message time
+export function formatMessageTime(timestamp) {
+  if (!timestamp) return "";
+  let date = null;
+  if (timestamp.toDate) {
+    date = timestamp.toDate();
+  } else if (timestamp instanceof Date) {
+    date = timestamp;
+  } else if (typeof timestamp === "number") {
+    date = new Date(timestamp);
   }
-  return a;
+
+  if (!date || isNaN(date.getTime())) return "";
+
+  const now = new Date();
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+
+  if (isToday) {
+    return `${hours}:${minutes}`;
+  }
+  if (isYesterday) {
+    return `Kecha, ${hours}:${minutes}`;
+  }
+
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
 }

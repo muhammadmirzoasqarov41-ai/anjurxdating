@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
+import { useChatStore } from "./store/chatStore";
+import { updateUserPresence } from "./lib/firestore";
 import ProtectedRoute from "./components/ProtectedRoute";
 import TopNav from "./components/TopNav";
 import Login from "./pages/Login";
@@ -14,12 +16,33 @@ import Admin from "./pages/Admin";
 import AdminRoute from "./components/AdminRoute";
 
 export default function App() {
-  const { init, initializing } = useAuthStore();
+  const { user, init, initializing } = useAuthStore();
   const location = useLocation();
 
   useEffect(() => {
     init();
   }, [init]);
+
+  // App-wide presence and real-time message notifications
+  useEffect(() => {
+    if (user?.uid) {
+      updateUserPresence(user.uid, true);
+      useChatStore.getState().startListening(user.uid);
+
+      const onFocus = () => updateUserPresence(user.uid, true);
+      const onBlur = () => updateUserPresence(user.uid, false);
+      window.addEventListener("focus", onFocus);
+      window.addEventListener("blur", onBlur);
+
+      return () => {
+        window.removeEventListener("focus", onFocus);
+        window.removeEventListener("blur", onBlur);
+        updateUserPresence(user.uid, false);
+      };
+    } else {
+      useChatStore.getState().stopListening();
+    }
+  }, [user?.uid]);
 
   if (initializing) {
     // pantalla breve mientras firebase resuelve si hay sesion

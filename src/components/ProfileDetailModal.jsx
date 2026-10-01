@@ -13,6 +13,7 @@ import {
   Bookmark,
   Languages,
 } from "lucide-react";
+import { formatDistance } from "../lib/location";
 
 export default function ProfileDetailModal({
   profile,
@@ -194,11 +195,15 @@ export default function ProfileDetailModal({
                   <MapPin size={13} className="text-gray-400" /> {profile.city}
                 </span>
               )}
-              {typeof profile.distanceKm === "number" && (
+              {typeof profile.realDistanceKm === "number" ? (
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 font-medium">
-                  <MapPin size={13} className="text-gray-400" /> {profile.distanceKm} km uzoqlikda
+                  <MapPin size={13} className="text-gray-400" /> {formatDistance(profile.realDistanceKm)}
                 </span>
-              )}
+              ) : !profile.city ? (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 font-medium text-gray-500">
+                  <MapPin size={13} className="text-gray-400" /> Joylashuv noaniq
+                </span>
+              ) : null}
               {profile.datingIntention && (
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-rose-50 text-rose-700 font-medium border border-rose-100">
                   <Heart size={13} className="text-rose-500" /> {profile.datingIntention}

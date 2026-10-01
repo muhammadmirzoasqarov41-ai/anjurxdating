@@ -10,7 +10,8 @@ export const BOTS = [
     age: 26,
     bio: "Kunduzi dizayner, kechasi kinoman. Agar qahvani yoqtirmasangiz, munosabatimiz o'xsharmikin, bilmadim.",
     job: "UX dizayner",
-    distanceKm: 3,
+    city: "Toshkent",
+    approxLocation: { lat: 41.31, lng: 69.28 },
     interests: ["Qahva", "Kino", "Sayr"],
     photos: [
       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&q=80",
@@ -24,7 +25,8 @@ export const BOTS = [
     age: 29,
     bio: "Dam olish kunlari gitara chalib turaman va ko'ringanimdan ko'ra yaxshiroq ovqat pishiraman. Pleylistlarimni baham ko'radigan odam qidiryapman.",
     job: "Dasturiy ta'minot muhandisi",
-    distanceKm: 7,
+    city: "Toshkent",
+    approxLocation: { lat: 41.34, lng: 69.22 },
     interests: ["Musiqa", "Sayohat", "Pazandachilik"],
     photos: [
       "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&q=80",
@@ -38,7 +40,8 @@ export const BOTS = [
     age: 24,
     bio: "Itlarni va kutilmagan rejalarni yaxshi ko'raman. Sayohatdagi eng qiziq voqeangizni aytib bering.",
     job: "Veterinar",
-    distanceKm: 12,
+    city: "Samarqand",
+    approxLocation: { lat: 39.65, lng: 66.96 },
     interests: ["Itlar", "Sohil", "Mutolaa"],
     photos: [
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&q=80",
