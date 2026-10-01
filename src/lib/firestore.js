@@ -245,7 +245,13 @@ export async function getDeck(uid, myProfile = {}, filters = {}) {
   );
   const others = profilesSnap.docs
     .map((d) => ({ uid: d.id, ...d.data() }))
-    .filter((p) => p.uid !== uid && !swiped.has(p.uid) && !blocked.has(p.uid));
+    .filter(
+      (p) =>
+        p.uid !== uid &&
+        !swiped.has(p.uid) &&
+        !blocked.has(p.uid) &&
+        p.privacy?.isPublic !== false
+    );
 
   // los bots tambien se filtran si ya los swipeaste o bloqueaste
   const bots = BOTS.filter((b) => !swiped.has(b.uid) && !blocked.has(b.uid));

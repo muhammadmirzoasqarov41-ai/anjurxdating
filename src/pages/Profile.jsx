@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   LogOut,
@@ -8,15 +8,16 @@ import {
   Heart,
   Edit3,
   Flame,
-  X,
   Check,
-  Sliders,
   Navigation,
   Lock,
   RefreshCw,
   UserX,
   Eye,
-  ShieldAlert,
+  Camera,
+  Star,
+  Languages,
+  ChevronRight,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { isSuperAdminUser } from "../components/AdminRoute";
@@ -27,17 +28,16 @@ import {
   updateUserPresence,
 } from "../lib/firestore";
 import BlockedUsersModal from "../components/BlockedUsersModal";
-import {
-  STANDARD_INTERESTS,
-  DATING_INTENTIONS,
-  CITIES,
-} from "../lib/matching";
+import ProfileDetailModal from "../components/ProfileDetailModal";
+import ProfileEditModal from "../components/ProfileEditModal";
+import { getProfileCompletion } from "../lib/profileCompletion";
 
 export default function Profile() {
   const { user, profile, logout, refreshProfile } = useAuthStore();
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editInitialTab, setEditInitialTab] = useState("photos");
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   const {
     currentLocation,
@@ -53,6 +53,47 @@ export default function Profile() {
   const privacy = profile?.privacy || {};
   const showOnlineStatus = privacy.showOnlineStatus !== false;
   const showLastSeen = privacy.showLastSeen !== false;
+  const isPublic = privacy.isPublic !== false;
+
+  // Real Profile Completion
+  const completion = useMemo(() => {
+    return getProfileCompletion(profile || {});
+  }, [profile]);
+
+  // Preview profile object for ProfileDetailModal
+  const previewProfile = useMemo(() => {
+    if (!profile) return null;
+    return {
+      ...profile,
+      uid: user?.uid,
+      displayName: profile.displayName || "Foydalanuvchi",
+      photos:
+        Array.isArray(profile.photos) && profile.photos.length > 0
+          ? profile.photos
+          : [],
+      age: profile.age,
+      city: profile.city || "Toshkent",
+      job: profile.job,
+      bio: profile.bio,
+      datingIntention: profile.datingIntention,
+      languages: profile.languages || ["O'zbekcha"],
+      interests: profile.interests || [],
+      online: true,
+      verified: Boolean(profile.verified || profile.isVerified),
+      distanceKm: null,
+    };
+  }, [profile, user?.uid]);
+
+  const handleOpenEdit = (tab = "basic") => {
+    setEditInitialTab(tab);
+    setShowEditModal(true);
+  };
+
+  const handleSaveProfileData = async (updatedData) => {
+    if (!user) return;
+    await saveProfile(user.uid, updatedData);
+    await refreshProfile();
+  };
 
   const handleToggleOnlinePrivacy = async (checked) => {
     if (!user) return;
@@ -81,104 +122,171 @@ export default function Profile() {
     }
   };
 
-  // Edit form state
-  const [formData, setFormData] = useState({
-    displayName: profile?.displayName || "",
-    age: profile?.age || "",
-    job: profile?.job || "",
-    bio: profile?.bio || "",
-    city: profile?.city || "Toshkent",
-    datingIntention: profile?.datingIntention || DATING_INTENTIONS[0],
-    interests: Array.isArray(profile?.interests) ? [...profile.interests] : [],
-    preferences: {
-      minAge: profile?.preferences?.minAge || 18,
-      maxAge: profile?.preferences?.maxAge || 40,
-      gender: profile?.preferences?.gender || "all",
-    },
-  });
-
-  const handleOpenEdit = () => {
-    setFormData({
-      displayName: profile?.displayName || "",
-      age: profile?.age || "",
-      job: profile?.job || "",
-      bio: profile?.bio || "",
-      city: profile?.city || "Toshkent",
-      datingIntention: profile?.datingIntention || DATING_INTENTIONS[0],
-      interests: Array.isArray(profile?.interests) ? [...profile.interests] : [],
-      preferences: {
-        minAge: profile?.preferences?.minAge || 18,
-        maxAge: profile?.preferences?.maxAge || 40,
-        gender: profile?.preferences?.gender || "all",
-      },
-    });
-    setShowEditModal(true);
-  };
-
-  const handleToggleInterest = (item) => {
-    setFormData((prev) => {
-      const exists = prev.interests.includes(item);
-      const updated = exists
-        ? prev.interests.filter((i) => i !== item)
-        : [...prev.interests, item];
-      return { ...prev, interests: updated };
-    });
-  };
-
-  const handleSave = async (e) => {
-    e.preventDefault();
+  const handleToggleVisibility = async (checked) => {
     if (!user) return;
-    setSaving(true);
     try {
-      await saveProfile(user.uid, {
-        displayName: formData.displayName.trim() || profile?.displayName,
-        age: formData.age ? Number(formData.age) : null,
-        job: formData.job.trim() || null,
-        bio: formData.bio.trim() || null,
-        city: formData.city,
-        datingIntention: formData.datingIntention,
-        interests: formData.interests,
-        preferences: formData.preferences,
-      });
-
+      const updated = { ...(profile?.privacy || {}), isPublic: checked };
+      await updatePrivacySettings(user.uid, updated);
       await refreshProfile();
-      setShowEditModal(false);
     } catch (err) {
-      console.error("Profilni saqlashda xatolik:", err);
-      alert("Profilni saqlashda xatolik yuz berdi. Qayta urinib ko'ring.");
-    } finally {
-      setSaving(false);
+      console.error("Ko'rinishni yangilashda xatolik:", err);
     }
   };
 
+  const photosList = Array.isArray(profile?.photos) ? profile.photos : [];
+
   return (
-    <div className="max-w-md mx-auto px-4 py-6">
-      <div className="rounded-2xl bg-white shadow-card overflow-hidden">
-        <div className="h-40 flame-bg" />
+    <div className="max-w-md mx-auto px-4 py-6 select-none">
+      <div className="rounded-3xl bg-white shadow-card overflow-hidden border border-gray-100">
+        {/* Banner with gradient */}
+        <div className="h-36 flame-bg relative flex items-center justify-end p-4">
+          <button
+            onClick={() => setShowPreviewModal(true)}
+            className="px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-xs text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs border border-white/20 active:scale-95"
+            title="Boshqalar sizni qanday ko'rishini bilish"
+          >
+            <Eye size={14} />
+            <span>Ko'rib chiqish</span>
+          </button>
+        </div>
+
         <div className="px-6 pb-6 -mt-14">
-          {/* Avatar */}
-          <div className="w-28 h-28 rounded-full border-4 border-white overflow-hidden bg-gray-100 mx-auto flex items-center justify-center shadow-xs">
-            {profile?.photos?.[0] ? (
-              <img
-                src={profile.photos[0]}
-                alt={profile.displayName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span className="text-3xl font-bold text-gray-400">
-                {profile?.displayName?.[0]?.toUpperCase()}
-              </span>
-            )}
+          {/* Avatar with photo edit trigger */}
+          <div className="relative w-28 h-28 mx-auto">
+            <div className="w-28 h-28 rounded-full border-4 border-white overflow-hidden bg-gray-100 mx-auto flex items-center justify-center shadow-card">
+              {photosList[0] ? (
+                <img
+                  src={photosList[0]}
+                  alt={profile?.displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-3xl font-bold text-gray-400">
+                  {profile?.displayName?.[0]?.toUpperCase() || "U"}
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleOpenEdit("photos")}
+              className="absolute bottom-0 right-0 w-8 h-8 rounded-full flame-bg text-white flex items-center justify-center shadow-md ring-2 ring-white hover:scale-105 active:scale-95 transition-all"
+              title="Rasmni almashtirish"
+            >
+              <Camera size={14} />
+            </button>
           </div>
 
           {/* Name & Email */}
           <div className="text-center mt-3">
-            <h1 className="text-xl font-bold text-gray-900">
-              {profile?.displayName}
-              {profile?.age ? `, ${profile.age}` : ""}
-            </h1>
-            <p className="text-sm text-gray-400 mt-0.5">{user?.email}</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <h1 className="text-xl font-black text-gray-900">
+                {profile?.displayName}
+                {profile?.age ? `, ${profile.age}` : ""}
+              </h1>
+              {Boolean(profile?.verified || profile?.isVerified) && (
+                <span className="px-1.5 py-0.2 rounded-full bg-sky-50 text-sky-600 text-[10px] font-bold border border-sky-100">
+                  ✓
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
           </div>
+
+          {/* Profile Completion Card */}
+          <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-rose-50/70 via-orange-50/50 to-white border border-rose-100 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Star size={16} className="text-flame-start" fill="currentColor" />
+                <span className="font-extrabold text-xs text-gray-800">
+                  Profil to'liqligi
+                </span>
+              </div>
+              <span className="font-black text-sm flame-text">
+                {completion.percentage}%
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-2 rounded-full bg-gray-200/80 overflow-hidden">
+              <div
+                className="h-full flame-bg transition-all duration-500 rounded-full"
+                style={{ width: `${completion.percentage}%` }}
+              />
+            </div>
+
+            {/* Incomplete checklist CTA */}
+            {!completion.isComplete && completion.missingItems.length > 0 && (
+              <div className="pt-2 border-t border-rose-100/60 space-y-1.5">
+                <p className="text-[11px] font-bold text-gray-700">
+                  Profilingizni to'ldiring (+{100 - completion.percentage}%):
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {completion.missingItems.slice(0, 4).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleOpenEdit(item.tab)}
+                      className="text-left px-2.5 py-1.5 rounded-xl bg-white/80 hover:bg-white border border-rose-100 text-[11px] font-semibold text-gray-700 flex items-center justify-between gap-1 transition-all shadow-2xs active:scale-98"
+                    >
+                      <span className="truncate">○ {item.label}</span>
+                      <ChevronRight size={12} className="text-gray-400 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Multiple Photos Gallery preview */}
+          {photosList.length > 0 && (
+            <div className="mt-5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Rasmlarim ({photosList.length}/{6})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEdit("photos")}
+                  className="text-xs font-bold text-flame-start hover:underline"
+                >
+                  Boshqarish
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto thin-scroll pb-1">
+                {photosList.map((src, i) => (
+                  <div
+                    key={i}
+                    onClick={() => handleOpenEdit("photos")}
+                    className="relative w-16 h-20 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0 cursor-pointer hover:border-flame-start transition-all"
+                  >
+                    <img
+                      src={src}
+                      alt={`Photo ${i + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {i === 0 && (
+                      <span className="absolute bottom-1 left-1 px-1 rounded bg-black/60 text-white text-[8px] font-bold">
+                        Asosiy
+                      </span>
+                    )}
+                  </div>
+                ))}
+
+                {photosList.length < 6 && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit("photos")}
+                    className="w-16 h-20 rounded-xl border border-dashed border-gray-300 hover:border-flame-start text-gray-400 hover:text-flame-start flex flex-col items-center justify-center gap-1 shrink-0 transition-colors"
+                  >
+                    <Camera size={16} />
+                    <span className="text-[9px] font-bold">+ Qo'shish</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Quick info list */}
           <div className="mt-4 space-y-2 text-sm text-gray-600">
@@ -200,33 +308,71 @@ export default function Profile() {
           </div>
 
           {/* Bio */}
-          {profile?.bio && (
-            <p className="mt-4 text-sm text-gray-700 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
+          {profile?.bio ? (
+            <p className="mt-4 text-sm text-gray-700 leading-relaxed bg-gray-50 p-3.5 rounded-2xl border border-gray-100">
               {profile.bio}
             </p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleOpenEdit("bio")}
+              className="mt-4 w-full p-3 rounded-2xl border border-dashed border-gray-200 text-xs font-semibold text-gray-400 hover:text-flame-start hover:border-flame-start transition-colors text-center"
+            >
+              + O'zingiz haqingizda ma'lumot yozing (Bio)
+            </button>
           )}
 
           {/* Interests */}
           {profile?.interests?.length > 0 && (
             <div className="mt-4">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                Qiziqishlarim
+                Qiziqishlarim ({profile.interests.length})
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {profile.interests.map((item, idx) => (
                   <span
                     key={idx}
-                    className="px-2.5 py-1 rounded-full bg-orange-50 text-flame-start text-xs font-semibold border border-orange-100"
+                    className="px-2.5 py-1 rounded-full bg-orange-50 text-flame-start text-xs font-semibold border border-orange-100 flex items-center gap-1"
                   >
-                    {item}
+                    <Flame size={11} fill="currentColor" />
+                    <span>{item}</span>
                   </span>
                 ))}
               </div>
             </div>
           )}
 
+          {/* Languages */}
+          {profile?.languages?.length > 0 && (
+            <div className="mt-4">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                Muloqot tillari
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {profile.languages.map((lang, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-medium flex items-center gap-1"
+                  >
+                    <Languages size={12} className="text-gray-400" />
+                    <span>{lang}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Edit Profile Button */}
+          <button
+            onClick={() => handleOpenEdit("basic")}
+            className="mt-5 w-full py-3 rounded-full flame-bg text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-95 active:scale-95 transition-all shadow-md"
+          >
+            <Edit3 size={16} />
+            <span>Profilni Tahrirlash</span>
+          </button>
+
           {/* Maxfiylik va Xavfsizlik (Privacy & Safety) */}
-          <div className="mt-5 p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3.5">
+          <div className="mt-6 p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Shield size={16} className="text-flame-start" />
@@ -249,15 +395,33 @@ export default function Profile() {
                   }`}
                 />
                 {permissionStatus === "granted" && currentLocation
-                  ? (currentLocation.city || "Joylashuv faol")
+                  ? currentLocation.city || "Joylashuv faol"
                   : "Aniqlanmagan"}
               </span>
             </div>
 
             {/* Privacy Toggles */}
             <div className="space-y-2.5 pt-1 border-t border-gray-200/60 text-xs">
-              {/* Joylashuv ruxsati */}
+              {/* Profil ko'rinishi (Discover'da ko'rinish) */}
               <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <span className="font-semibold text-gray-700 block">
+                    Profil ko'rinishi (Discover)
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    Boshqalar sizni kashf qilishda ko'rishlari mumkin
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => handleToggleVisibility(e.target.checked)}
+                  className="w-4 h-4 rounded text-flame-start accent-[#fd5068]"
+                />
+              </label>
+
+              {/* Joylashuv ruxsati */}
+              <label className="flex items-center justify-between cursor-pointer pt-1 border-t border-gray-100">
                 <div>
                   <span className="font-semibold text-gray-700 block">
                     Joylashuvdan foydalanish
@@ -357,36 +521,31 @@ export default function Profile() {
                 size={12}
                 className={locationLoading ? "animate-spin text-flame-start" : ""}
               />
-              <span>{locationLoading ? "Aniqlanmoqda..." : "Joylashuvni yangilash"}</span>
+              <span>
+                {locationLoading ? "Aniqlanmoqda..." : "Joylashuvni yangilash"}
+              </span>
             </button>
 
             {/* Privacy Notice */}
             <p className="flex items-start gap-1.5 text-[10px] text-gray-400 leading-tight pt-1">
               <Lock size={12} className="text-gray-400 shrink-0 mt-0.5" />
               <span>
-                Aniq koordinatalaringiz yoki ko'cha manzilingiz hech qachon oshkor qilinmaydi.
-                Barcha xavfsizlik sozlamalari real vaqtda qo'llaniladi.
+                Aniq koordinatalaringiz yoki shaxsiy hisob ma'lumotlaringiz hech qachon oshkor qilinmaydi.
               </span>
             </p>
           </div>
 
-          {/* Tahrirlash tugmasi */}
-          <button
-            onClick={handleOpenEdit}
-            className="mt-6 w-full py-2.5 rounded-full border border-gray-200 hover:border-flame-start text-gray-700 hover:text-flame-start font-semibold text-xs flex items-center justify-center gap-2 transition-colors shadow-2xs"
-          >
-            <Edit3 size={15} /> Profilni va Tanishuv Afzalliklarini Tahrirlash
-          </button>
-
+          {/* Admin panel link if authorized */}
           {isSuperAdminUser(user) && (
             <Link
               to="/admin"
-              className="mt-3 w-full py-3 rounded-full flame-bg text-white font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+              className="mt-4 w-full py-3 rounded-full flame-bg text-white font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity text-xs"
             >
               <Shield size={18} /> Admin Panel
             </Link>
           )}
 
+          {/* Logout */}
           <button
             onClick={logout}
             className="mt-3 w-full py-2.5 rounded-full border border-gray-200 text-gray-700 font-semibold text-xs flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
@@ -396,204 +555,29 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* EDIT PROFILE & DATING PREFERENCES MODAL */}
-      {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-card overflow-hidden my-auto max-h-[85vh] flex flex-col border border-gray-100 animate-in fade-in">
-            {/* Header */}
-            <div className="flame-bg p-4 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Flame size={18} fill="currentColor" />
-                <h3 className="font-bold text-sm">
-                  Profil va Tanishuv Afzalliklari
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSave} className="p-5 space-y-4 overflow-y-auto thin-scroll text-xs">
-              {/* Ism va Yosh */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-gray-700 block mb-1">Ismingiz</label>
-                  <input
-                    type="text"
-                    value={formData.displayName}
-                    onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 outline-none text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-gray-700 block mb-1">Yoshingiz</label>
-                  <input
-                    type="number"
-                    min="18"
-                    max="80"
-                    value={formData.age}
-                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 outline-none text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Kasb va Hudud */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-gray-700 block mb-1">Kasbingiz</label>
-                  <input
-                    type="text"
-                    value={formData.job}
-                    onChange={(e) => setFormData({ ...formData, job: e.target.value })}
-                    placeholder="Masalan: Dasturchi"
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 outline-none text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-gray-700 block mb-1">Shahar / Viloyat</label>
-                  <select
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 outline-none text-xs"
-                  >
-                    {CITIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Tanishuv Maqsadi */}
-              <div>
-                <label className="font-bold text-gray-700 block mb-1">Tanishuv Maqsadingiz</label>
-                <select
-                  value={formData.datingIntention}
-                  onChange={(e) => setFormData({ ...formData, datingIntention: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 outline-none text-xs font-semibold"
-                >
-                  {DATING_INTENTIONS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Bio */}
-              <div>
-                <label className="font-bold text-gray-700 block mb-1">O'zingiz haqingizda</label>
-                <textarea
-                  rows="3"
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  placeholder="Xarakteringiz va qiziqishlaringiz haqida qisqacha..."
-                  className="w-full p-2.5 rounded-xl bg-gray-50 border border-gray-200 outline-none text-xs resize-none"
-                />
-              </div>
-
-              {/* Qiziqishlar tanlash */}
-              <div>
-                <label className="font-bold text-gray-700 block mb-1">
-                  Qiziqishlaringiz ({formData.interests.length} ta tanlandi)
-                </label>
-                <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-2xl border border-gray-200 max-h-36 overflow-y-auto thin-scroll">
-                  {STANDARD_INTERESTS.map((item) => {
-                    const isSelected = formData.interests.includes(item);
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => handleToggleInterest(item)}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all border ${
-                          isSelected
-                            ? "flame-bg text-white border-transparent shadow-2xs"
-                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"
-                        }`}
-                      >
-                        {isSelected && "✓ "}
-                        {item}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Tanishuv Afzalliklari (Kimlarni qidiryapsiz) */}
-              <div className="p-3 bg-rose-50/50 rounded-2xl border border-rose-100 space-y-2">
-                <span className="font-bold text-gray-800 text-[11px] uppercase tracking-wider block flex items-center gap-1">
-                  <Sliders size={12} className="text-flame-start" /> Smart Matching Afzalliklari
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <span className="text-[10px] text-gray-500 block mb-0.5">Min yosh</span>
-                    <input
-                      type="number"
-                      min="18"
-                      max="60"
-                      value={formData.preferences.minAge}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          preferences: {
-                            ...formData.preferences,
-                            minAge: Number(e.target.value),
-                          },
-                        })
-                      }
-                      className="w-full px-2 py-1.5 rounded-lg bg-white border border-gray-200 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-gray-500 block mb-0.5">Maks yosh</span>
-                    <input
-                      type="number"
-                      min="18"
-                      max="70"
-                      value={formData.preferences.maxAge}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          preferences: {
-                            ...formData.preferences,
-                            maxAge: Number(e.target.value),
-                          },
-                        })
-                      }
-                      className="w-full px-2 py-1.5 rounded-lg bg-white border border-gray-200 text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Submit */}
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 rounded-full border border-gray-200 text-gray-600 font-semibold text-xs hover:bg-gray-50"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 rounded-full flame-bg text-white font-bold text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {saving ? "Saqlanmoqda..." : "Saqlash"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Blocked Users Modal */}
       {showBlockedModal && (
         <BlockedUsersModal onClose={() => setShowBlockedModal(false)} />
+      )}
+
+      {/* Profile Detail Preview Modal */}
+      {showPreviewModal && previewProfile && (
+        <ProfileDetailModal
+          profile={previewProfile}
+          isPreview={true}
+          onClose={() => setShowPreviewModal(false)}
+        />
+      )}
+
+      {/* Modular Profile Edit Modal */}
+      {showEditModal && (
+        <ProfileEditModal
+          profile={profile}
+          userId={user?.uid}
+          initialTab={editInitialTab}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleSaveProfileData}
+        />
       )}
 
       <p className="text-center text-xs text-gray-400 mt-5 leading-relaxed px-4">

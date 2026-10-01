@@ -29,6 +29,7 @@ export default function ProfileDetailModal({
   onToggleFavorite,
   isFavorited,
   onBlocked,
+  isPreview = false,
 }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showActionMenu, setShowActionMenu] = useState(false);
@@ -74,40 +75,42 @@ export default function ProfileDetailModal({
               </button>
             )}
 
-            {/* Safety Options Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowActionMenu(!showActionMenu)}
-                className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors shadow-xs"
-                title="Xavfsizlik amallari"
-              >
-                <MoreVertical size={16} />
-              </button>
-              {showActionMenu && (
-                <div className="absolute right-0 top-10 w-44 bg-white rounded-2xl shadow-card border border-gray-100 py-1.5 z-40 text-xs">
-                  <button
-                    onClick={() => {
-                      setShowActionMenu(false);
-                      setShowReportModal(true);
-                    }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-semibold transition-colors"
-                  >
-                    <ShieldAlert size={14} className="text-amber-500" />
-                    <span>Shikoyat qilish</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowActionMenu(false);
-                      setShowBlockModal(true);
-                    }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-rose-600 font-semibold border-t border-gray-100 transition-colors"
-                  >
-                    <UserX size={14} className="text-rose-500" />
-                    <span>Bloklash</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Safety Options Menu (hidden in preview) */}
+            {!isPreview && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowActionMenu(!showActionMenu)}
+                  className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors shadow-xs"
+                  title="Xavfsizlik amallari"
+                >
+                  <MoreVertical size={16} />
+                </button>
+                {showActionMenu && (
+                  <div className="absolute right-0 top-10 w-44 bg-white rounded-2xl shadow-card border border-gray-100 py-1.5 z-40 text-xs">
+                    <button
+                      onClick={() => {
+                        setShowActionMenu(false);
+                        setShowReportModal(true);
+                      }}
+                      className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-semibold transition-colors"
+                    >
+                      <ShieldAlert size={14} className="text-amber-500" />
+                      <span>Shikoyat qilish</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowActionMenu(false);
+                        setShowBlockModal(true);
+                      }}
+                      className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-rose-600 font-semibold border-t border-gray-100 transition-colors"
+                    >
+                      <UserX size={14} className="text-rose-500" />
+                      <span>Bloklash</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               onClick={onClose}
@@ -308,72 +311,90 @@ export default function ProfileDetailModal({
               )}
 
               {/* Safety Footer Actions */}
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-xs font-semibold text-gray-400">
-                <button
-                  type="button"
-                  onClick={() => setShowReportModal(true)}
-                  className="hover:text-amber-600 transition-colors flex items-center gap-1.5 py-1"
-                >
-                  <ShieldAlert size={14} />
-                  <span>Shikoyat qilish</span>
-                </button>
-                <span>•</span>
-                <button
-                  type="button"
-                  onClick={() => setShowBlockModal(true)}
-                  className="hover:text-rose-600 transition-colors flex items-center gap-1.5 py-1"
-                >
-                  <UserX size={14} />
-                  <span>Bloklash</span>
-                </button>
-              </div>
+              {!isPreview && (
+                <div className="pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-xs font-semibold text-gray-400">
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(true)}
+                    className="hover:text-amber-600 transition-colors flex items-center gap-1.5 py-1"
+                  >
+                    <ShieldAlert size={14} />
+                    <span>Shikoyat qilish</span>
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowBlockModal(true)}
+                    className="hover:text-rose-600 transition-colors flex items-center gap-1.5 py-1"
+                  >
+                    <UserX size={14} />
+                    <span>Bloklash</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Bottom Actions (Nope, Super Like, Like) */}
-          <div className="p-3.5 bg-white border-t border-gray-100 flex items-center justify-center gap-4 flex-shrink-0">
-            {/* Nope */}
-            {onNope && (
+          {/* Bottom Actions */}
+          {isPreview ? (
+            <div className="p-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-gray-600">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Sizning ommaviy profilingiz
+              </span>
               <button
-                onClick={() => {
-                  onNope(profile);
-                  onClose();
-                }}
-                className="w-12 h-12 rounded-full bg-white shadow-card flex items-center justify-center text-nope hover:scale-105 active:scale-95 transition-transform border border-gray-100"
-                title="Yoqmadi"
+                type="button"
+                onClick={onClose}
+                className="px-4 py-1.5 rounded-full flame-bg text-white font-bold text-xs hover:opacity-90 transition-opacity shadow-xs"
               >
-                <X size={24} strokeWidth={3} />
+                Yopish
               </button>
-            )}
+            </div>
+          ) : (
+            <div className="p-3.5 bg-white border-t border-gray-100 flex items-center justify-center gap-4 flex-shrink-0">
+              {/* Nope */}
+              {onNope && (
+                <button
+                  onClick={() => {
+                    onNope(profile);
+                    onClose();
+                  }}
+                  className="w-12 h-12 rounded-full bg-white shadow-card flex items-center justify-center text-nope hover:scale-105 active:scale-95 transition-transform border border-gray-100"
+                  title="Yoqmadi"
+                >
+                  <X size={24} strokeWidth={3} />
+                </button>
+              )}
 
-            {/* Super Like */}
-            {onSuperLike && (
-              <button
-                onClick={() => {
-                  onSuperLike(profile);
-                  onClose();
-                }}
-                className="w-12 h-12 rounded-full bg-sky-50 shadow-card flex items-center justify-center text-superlike hover:scale-105 active:scale-95 transition-transform border border-sky-100"
-                title="Super Like"
-              >
-                <Star size={22} fill="currentColor" />
-              </button>
-            )}
+              {/* Super Like */}
+              {onSuperLike && (
+                <button
+                  onClick={() => {
+                    onSuperLike(profile);
+                    onClose();
+                  }}
+                  className="w-12 h-12 rounded-full bg-sky-50 shadow-card flex items-center justify-center text-superlike hover:scale-105 active:scale-95 transition-transform border border-sky-100"
+                  title="Super Like"
+                >
+                  <Star size={22} fill="currentColor" />
+                </button>
+              )}
 
-            {/* Like */}
-            {onLike && (
-              <button
-                onClick={() => {
-                  onLike(profile);
-                  onClose();
-                }}
-                className="w-12 h-12 rounded-full bg-white shadow-card flex items-center justify-center text-like hover:scale-105 active:scale-95 transition-transform border border-gray-100"
-                title="Yoqdi"
-              >
-                <Heart size={24} fill="currentColor" />
-              </button>
-            )}
-          </div>
+              {/* Like */}
+              {onLike && (
+                <button
+                  onClick={() => {
+                    onLike(profile);
+                    onClose();
+                  }}
+                  className="w-12 h-12 rounded-full bg-white shadow-card flex items-center justify-center text-like hover:scale-105 active:scale-95 transition-transform border border-gray-100"
+                  title="Yoqdi"
+                >
+                  <Heart size={24} fill="currentColor" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </motion.div>
 
