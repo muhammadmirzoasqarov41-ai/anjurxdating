@@ -108,6 +108,16 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // Notifications: recipient can read/manage their own notifications; authenticated users can create notifications for recipient
+    match /tinder_notifications/{userId} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+
+      match /items/{notificationId} {
+        allow read, update, delete: if isOwner(userId) || isSuperAdmin();
+        allow create: if isAuthenticated();
+      }
+    }
+
     // Admin audit logs: admins can read and log actions, only super admin can delete
     match /admin_logs/{logId} {
       allow read, create: if isAdminOrSuperAdmin();

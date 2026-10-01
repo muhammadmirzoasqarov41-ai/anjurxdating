@@ -275,7 +275,7 @@ export async function recordSwipe(me, target, liked, isSuperLike = false) {
     createdAt: serverTimestamp(),
   });
 
-  // 2. If Super Like, record in tinder_super_likes
+  // 2. If Super Like, record in tinder_super_likes and send notification
   if (isSuperLike) {
     try {
       await setDoc(doc(db, "tinder_super_likes", `${me.uid}_${target.uid}`), {
@@ -291,9 +291,35 @@ export async function recordSwipe(me, target, liked, isSuperLike = false) {
         createdAt: serverTimestamp(),
         status: "active",
       });
+
+      // Send Super Like notification to target if real user
+      if (!isBotUid(target.uid)) {
+        createNotification(target.uid, {
+          id: `superlike_${me.uid}_${target.uid}`,
+          type: "super_like",
+          title: "Super Like ⭐",
+          message: `${me.displayName || "Foydalanuvchi"} sizga Super Like yubordi!`,
+          senderUid: me.uid,
+          senderName: me.displayName || "Foydalanuvchi",
+          senderPhoto: me.photos?.[0] || null,
+          relatedId: me.uid,
+          route: "/",
+        }).catch(() => {});
+      }
     } catch (err) {
       console.warn("Could not save to tinder_super_likes:", err);
     }
+  } else if (liked && !isBotUid(target.uid)) {
+    // Regular Like notification (safe, privacy-compliant)
+    createNotification(target.uid, {
+      id: `like_${me.uid}_${target.uid}`,
+      type: "like",
+      title: "Yangi Like ✨",
+      message: "Kimdir profilingizni yoqtirdi! Discover orqali yangi insonlarni kashf eting.",
+      senderUid: me.uid,
+      relatedId: me.uid,
+      route: "/",
+    }).catch(() => {});
   }
 
   if (!liked) return null;
@@ -346,6 +372,39 @@ async function createMatch(me, target, isSuperLike = false) {
     },
     { merge: true }
   );
+
+  // Send Match notifications to both users
+  try {
+    // Notification for me
+    createNotification(me.uid, {
+      id: `match_${id}`,
+      type: "new_match",
+      title: "Yangi Match! ❤️",
+      message: `${target.displayName} bilan bir-biringizga yoqdingiz!`,
+      senderUid: target.uid,
+      senderName: target.displayName,
+      senderPhoto: target.photos?.[0] || null,
+      relatedId: id,
+      route: `/chat/${id}`,
+    }).catch(() => {});
+
+    // Notification for target (if not a bot)
+    if (!isBotUid(target.uid)) {
+      createNotification(target.uid, {
+        id: `match_${id}`,
+        type: "new_match",
+        title: "Yangi Match! ❤️",
+        message: `${me.displayName} bilan bir-biringizga yoqdingiz!`,
+        senderUid: me.uid,
+        senderName: me.displayName,
+        senderPhoto: me.photos?.[0] || null,
+        relatedId: id,
+        route: `/chat/${id}`,
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.warn("Could not send match notifications:", err);
+  }
 }
 
 export async function getMatches(uid) {
@@ -444,6 +503,24 @@ export async function sendMessage(matchId, senderUid, text, receiverUid = null) 
   await setDoc(doc(db, "tinder_matches", matchId), matchUpdate, {
     merge: true,
   });
+
+  // If receiver is a real user, trigger real-time message notification
+  if (receiverUid && !isBotUid(receiverUid)) {
+    try {
+      const preview = trimmed.length > 50 ? trimmed.slice(0, 50) + "..." : trimmed;
+      createNotification(receiverUid, {
+        id: `msg_${docRef.id}`,
+        type: "new_message",
+        title: "Yangi xabar",
+        message: preview,
+        senderUid,
+        relatedId: matchId,
+        route: `/chat/${matchId}`,
+      }).catch(() => {});
+    } catch (err) {
+      console.warn("Could not create message notification:", err);
+    }
+  }
 
   return docRef.id;
 }
@@ -549,3 +626,122 @@ export function formatMessageTime(timestamp) {
   const year = date.getFullYear();
   return `${day}.${month}.${year}`;
 }
+
+// ---------- notifications ----------
+
+/**
+ * Creates a notification for a recipient user with duplicate prevention.
+ */
+export async function createNotification(recipientUid, notificationData) {
+  if (!recipientUid || isBotUid(recipientUid)) return null;
+
+  const notifId =
+    notificationData.id ||
+    `${notificationData.type || "notif"}_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 7)}`;
+
+  const notifRef = doc(db, "tinder_notifications", recipientUid, "items", notifId);
+
+  await setDoc(
+    notifRef,
+    {
+      id: notifId,
+      recipientUid,
+      type: notificationData.type || "info",
+      title: notificationData.title || "Bildirishnoma",
+      message: notificationData.message || "",
+      senderUid: notificationData.senderUid || null,
+      senderName: notificationData.senderName || null,
+      senderPhoto: notificationData.senderPhoto || null,
+      relatedId: notificationData.relatedId || null,
+      route: notificationData.route || "/",
+      read: false,
+      createdAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return notifId;
+}
+
+/**
+ * Real-time listener for user's notifications (sorted by newest first, limit 30).
+ */
+export function listenNotifications(uid, cb) {
+  if (!uid) return () => {};
+
+  const q = query(
+    collection(db, "tinder_notifications", uid, "items"),
+    orderBy("createdAt", "desc"),
+    limit(30)
+  );
+
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      cb(list);
+    },
+    (err) => {
+      console.warn("listenNotifications error:", err);
+    }
+  );
+}
+
+/**
+ * Marks a single notification as read.
+ */
+export async function markNotificationAsRead(uid, notificationId) {
+  if (!uid || !notificationId) return;
+  try {
+    await setDoc(
+      doc(db, "tinder_notifications", uid, "items", notificationId),
+      {
+        read: true,
+        readAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error("markNotificationAsRead error:", err);
+  }
+}
+
+/**
+ * Marks all notifications as read for the user.
+ */
+export async function markAllNotificationsAsRead(uid, notificationIds = []) {
+  if (!uid || !notificationIds.length) return;
+  try {
+    await Promise.all(
+      notificationIds.map((id) =>
+        setDoc(
+          doc(db, "tinder_notifications", uid, "items", id),
+          {
+            read: true,
+            readAt: serverTimestamp(),
+          },
+          { merge: true }
+        )
+      )
+    );
+  } catch (err) {
+    console.error("markAllNotificationsAsRead error:", err);
+  }
+}
+
+/**
+ * Deletes a notification.
+ */
+export async function deleteNotification(uid, notificationId) {
+  if (!uid || !notificationId) return;
+  try {
+    await deleteDoc(
+      doc(db, "tinder_notifications", uid, "items", notificationId)
+    );
+  } catch (err) {
+    console.error("deleteNotification error:", err);
+  }
+}
+
