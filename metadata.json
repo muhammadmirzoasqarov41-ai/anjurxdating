@@ -1,0 +1,6 @@
+{
+  "name": "AnjurXdating",
+  "description": "O'zbekiston uchun xavfsiz va zamonaviy tanishuv dasturi - Profilni tekshirish, Smart Matching va ishonchli muloqot.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

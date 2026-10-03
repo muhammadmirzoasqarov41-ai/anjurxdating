@@ -18,26 +18,68 @@ import {
   Star,
   Languages,
   ChevronRight,
+  Sliders,
+  ShieldCheck,
+  Clock,
+  AlertCircle,
+  Copy,
+  Share2,
+  AtSign,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { isSuperAdminUser } from "../components/AdminRoute";
 import { useLocationStore } from "../store/locationStore";
 import {
   saveProfile,
+  saveUserPreferences,
   updatePrivacySettings,
   updateUserPresence,
+  getUserReportHistory,
 } from "../lib/firestore";
 import BlockedUsersModal from "../components/BlockedUsersModal";
 import ProfileDetailModal from "../components/ProfileDetailModal";
 import ProfileEditModal from "../components/ProfileEditModal";
-import { getProfileCompletion } from "../lib/profileCompletion";
+import DatingPreferencesModal from "../components/DatingPreferencesModal";
+import VerificationModal from "../components/VerificationModal";
+import VerifiedBadge from "../components/VerifiedBadge";
+import { getProfileCompletion, getProfileQuality } from "../lib/profileCompletion";
 
 export default function Profile() {
   const { user, profile, logout, refreshProfile } = useAuthStore();
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPreferencesModal, setShowPreferencesModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [showReportHistoryModal, setShowReportHistoryModal] = useState(false);
+  const [reportHistory, setReportHistory] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(false);
   const [editInitialTab, setEditInitialTab] = useState("photos");
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [copiedFeedback, setCopiedFeedback] = useState(null);
+
+  const handleCopyUsername = (e) => {
+    e?.stopPropagation();
+    if (!profile?.username) return;
+    navigator.clipboard.writeText(`@${profile.username.replace(/^@/, "")}`);
+    setCopiedFeedback("Username buferga nusxalandi!");
+    setTimeout(() => setCopiedFeedback(null), 2500);
+  };
+
+  const handleShareProfile = (e) => {
+    e?.stopPropagation();
+    const url = `${window.location.origin}/u/${profile?.username || user?.uid}`;
+    if (navigator.share) {
+      navigator.share({
+        title: `${profile?.displayName || "AnjurXdating profili"}`,
+        text: `Mening AnjurXdating profilim: @${profile?.username || ""}`,
+        url,
+      }).catch(() => {});
+      return;
+    }
+    navigator.clipboard.writeText(url);
+    setCopiedFeedback("Profil havolasi buferga nusxalandi!");
+    setTimeout(() => setCopiedFeedback(null), 2500);
+  };
 
   const {
     currentLocation,
@@ -59,6 +101,20 @@ export default function Profile() {
   const completion = useMemo(() => {
     return getProfileCompletion(profile || {});
   }, [profile]);
+
+  const quality = useMemo(() => {
+    return getProfileQuality(profile || {});
+  }, [profile]);
+
+  const handleOpenReportHistory = async () => {
+    setShowReportHistoryModal(true);
+    if (user?.uid) {
+      setLoadingReports(true);
+      const list = await getUserReportHistory(user.uid);
+      setReportHistory(list);
+      setLoadingReports(false);
+    }
+  };
 
   // Preview profile object for ProfileDetailModal
   const previewProfile = useMemo(() => {
@@ -92,6 +148,12 @@ export default function Profile() {
   const handleSaveProfileData = async (updatedData) => {
     if (!user) return;
     await saveProfile(user.uid, updatedData);
+    await refreshProfile();
+  };
+
+  const handleSavePreferences = async (newPreferences) => {
+    if (!user) return;
+    await saveUserPreferences(user.uid, newPreferences);
     await refreshProfile();
   };
 
@@ -185,26 +247,147 @@ export default function Profile() {
                 {profile?.age ? `, ${profile.age}` : ""}
               </h1>
               {Boolean(profile?.verified || profile?.isVerified) && (
-                <span className="px-1.5 py-0.2 rounded-full bg-sky-50 text-sky-600 text-[10px] font-bold border border-sky-100">
-                  ✓
-                </span>
+                <VerifiedBadge size={18} />
               )}
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
+
+            {/* Username pill with copy & share */}
+            {profile?.username ? (
+              <div className="inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full bg-rose-50/80 border border-rose-100 shadow-2xs">
+                <span className="font-bold text-xs text-flame-start">
+                  @{profile.username}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyUsername}
+                  className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-white transition-colors"
+                  title="Usernameni nusxalash"
+                >
+                  <Copy size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShareProfile}
+                  className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-white transition-colors"
+                  title="Profil havolasini ulashish"
+                >
+                  <Share2 size={12} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleOpenEdit("username")}
+                className="inline-flex items-center gap-1.5 mt-1.5 px-3.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-bold transition-all shadow-2xs"
+              >
+                <AtSign size={13} className="text-amber-600" />
+                <span>Noyob @username tanlash</span>
+              </button>
+            )}
+
+            {/* Toast feedback */}
+            {copiedFeedback && (
+              <p className="text-[11px] text-emerald-600 font-bold mt-1 animate-in fade-in">
+                {copiedFeedback}
+              </p>
+            )}
+
+            <p className="text-xs text-gray-400 mt-1">{user?.email}</p>
           </div>
 
-          {/* Profile Completion Card */}
-          <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-rose-50/70 via-orange-50/50 to-white border border-rose-100 shadow-2xs space-y-3">
+          {/* Verification Status Banner */}
+          <div
+            onClick={() => setShowVerificationModal(true)}
+            className={`mt-4 p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between gap-3 shadow-2xs group ${
+              Boolean(profile?.verified || profile?.isVerified)
+                ? "bg-sky-50/70 border-sky-200/80 hover:bg-sky-50"
+                : profile?.verificationStatus === "pending"
+                ? "bg-amber-50/70 border-amber-200/80 hover:bg-amber-50"
+                : profile?.verificationStatus === "rejected"
+                ? "bg-rose-50/70 border-rose-200/80 hover:bg-rose-50"
+                : "bg-gray-50/90 border-gray-200/80 hover:bg-gray-100"
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                  Boolean(profile?.verified || profile?.isVerified)
+                    ? "bg-sky-100 text-sky-600"
+                    : profile?.verificationStatus === "pending"
+                    ? "bg-amber-100 text-amber-600"
+                    : profile?.verificationStatus === "rejected"
+                    ? "bg-rose-100 text-rose-600"
+                    : "bg-gray-200 text-gray-600"
+                }`}
+              >
+                {Boolean(profile?.verified || profile?.isVerified) ? (
+                  <ShieldCheck size={20} />
+                ) : profile?.verificationStatus === "pending" ? (
+                  <Clock size={18} />
+                ) : profile?.verificationStatus === "rejected" ? (
+                  <AlertCircle size={18} />
+                ) : (
+                  <Shield size={18} />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-extrabold text-xs text-gray-900 block truncate">
+                    {Boolean(profile?.verified || profile?.isVerified)
+                      ? "Profil Tasdiqlangan"
+                      : profile?.verificationStatus === "pending"
+                      ? "Tasdiqlash ko'rib chiqilmoqda"
+                      : profile?.verificationStatus === "rejected"
+                      ? "Tasdiqlash rad etilgan"
+                      : "Profilni tasdiqlang"}
+                  </span>
+                  {Boolean(profile?.verified || profile?.isVerified) && (
+                    <VerifiedBadge size={14} />
+                  )}
+                </div>
+                <span className="text-[10px] text-gray-500 block truncate">
+                  {Boolean(profile?.verified || profile?.isVerified)
+                    ? "Moviy nishon faol • 2x ko'proq tavsiyalar"
+                    : profile?.verificationStatus === "pending"
+                    ? "Moderatsiya tekshirmoqda (2-24 soat)"
+                    : profile?.verificationStatus === "rejected"
+                    ? "Sababni ko'rish va qayta topshirish"
+                    : "Moviy nishon va 2x ko'proq tavsiyalar oling"}
+                </span>
+              </div>
+            </div>
+
+            <span className="text-[11px] font-bold text-flame-start group-hover:underline flex items-center gap-0.5 shrink-0">
+              {Boolean(profile?.verified || profile?.isVerified)
+                ? "Batafsil"
+                : profile?.verificationStatus === "pending"
+                ? "Holat"
+                : profile?.verificationStatus === "rejected"
+                ? "Qayta topshirish"
+                : "Tasdiqlash"}
+              <ChevronRight size={13} />
+            </span>
+          </div>
+
+          {/* Profile Completion & Quality Card */}
+          <div className="mt-3.5 p-4 rounded-2xl bg-gradient-to-br from-rose-50/70 via-orange-50/50 to-white border border-rose-100 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Star size={16} className="text-flame-start" fill="currentColor" />
                 <span className="font-extrabold text-xs text-gray-800">
-                  Profil to'liqligi
+                  Profil to'liqligi va sifati
                 </span>
               </div>
-              <span className="font-black text-sm flame-text">
-                {completion.percentage}%
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${quality.badgeColor}`}
+                >
+                  {quality.level}
+                </span>
+                <span className="font-black text-sm flame-text">
+                  {completion.percentage}%
+                </span>
+              </div>
             </div>
 
             {/* Progress bar */}
@@ -226,7 +409,15 @@ export default function Profile() {
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => handleOpenEdit(item.tab)}
+                      onClick={() => {
+                        if (item.tab === "verification") {
+                          setShowVerificationModal(true);
+                        } else if (item.tab === "preferences") {
+                          setShowPreferencesModal(true);
+                        } else {
+                          handleOpenEdit(item.tab);
+                        }
+                      }}
                       className="text-left px-2.5 py-1.5 rounded-xl bg-white/80 hover:bg-white border border-rose-100 text-[11px] font-semibold text-gray-700 flex items-center justify-between gap-1 transition-all shadow-2xs active:scale-98"
                     >
                       <span className="truncate">○ {item.label}</span>
@@ -362,14 +553,79 @@ export default function Profile() {
             </div>
           )}
 
-          {/* Edit Profile Button */}
-          <button
-            onClick={() => handleOpenEdit("basic")}
-            className="mt-5 w-full py-3 rounded-full flame-bg text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-95 active:scale-95 transition-all shadow-md"
+          {/* Action Buttons: Edit Profile & Dating Preferences */}
+          <div className="mt-5 grid grid-cols-2 gap-2.5">
+            <button
+              onClick={() => handleOpenEdit("basic")}
+              className="py-3 px-3 rounded-2xl flame-bg text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-95 transition-all shadow-md"
+            >
+              <Edit3 size={15} />
+              <span>Profilni Tahrirlash</span>
+            </button>
+
+            <button
+              onClick={() => setShowPreferencesModal(true)}
+              className="py-3 px-3 rounded-2xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95"
+            >
+              <Sliders size={15} className="text-flame-start" />
+              <span>Afzalliklar</span>
+            </button>
+          </div>
+
+          {/* Dating Preferences Overview Card */}
+          <div
+            onClick={() => setShowPreferencesModal(true)}
+            className="mt-4 p-4 rounded-2xl bg-gray-50/90 hover:bg-gray-50 border border-gray-200/80 cursor-pointer transition-all shadow-2xs group"
           >
-            <Edit3 size={16} />
-            <span>Profilni Tahrirlash</span>
-          </button>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
+                  <Sliders size={14} />
+                </div>
+                <span className="font-extrabold text-xs text-gray-900">
+                  Tanishuv afzalliklari
+                </span>
+              </div>
+              <span className="text-[11px] font-bold text-flame-start group-hover:underline flex items-center gap-0.5">
+                Sozlash <ChevronRight size={13} />
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-600 pt-1 border-t border-gray-200/60">
+              <div>
+                <span className="text-gray-400 block text-[10px]">Yosh oralig'i:</span>
+                <span className="font-bold text-gray-800">
+                  {profile?.preferences?.minAge || 18} — {profile?.preferences?.maxAge || 50} yosh
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400 block text-[10px]">Kimlar:</span>
+                <span className="font-bold text-gray-800">
+                  {profile?.preferences?.gender === "female"
+                    ? "Ayollar"
+                    : profile?.preferences?.gender === "male"
+                    ? "Erkaklar"
+                    : "Barchasi"}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400 block text-[10px]">Masofa:</span>
+                <span className="font-bold text-gray-800">
+                  {profile?.preferences?.maxDistanceKm
+                    ? `${profile.preferences.maxDistanceKm} km gacha`
+                    : "Cheklovsiz"}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400 block text-[10px]">Maqsad:</span>
+                <span className="font-bold text-gray-800 truncate block">
+                  {profile?.preferences?.datingIntention && profile.preferences.datingIntention !== "all"
+                    ? profile.preferences.datingIntention
+                    : "Ixtiyoriy"}
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* Maxfiylik va Xavfsizlik (Privacy & Safety) */}
           <div className="mt-6 p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3.5">
@@ -493,8 +749,8 @@ export default function Profile() {
               </label>
             </div>
 
-            {/* Blocked Users Button */}
-            <div className="pt-2 border-t border-gray-200/60">
+            {/* Blocked Users & Report History Buttons */}
+            <div className="pt-2 border-t border-gray-200/60 space-y-2">
               <button
                 type="button"
                 onClick={() => setShowBlockedModal(true)}
@@ -506,6 +762,20 @@ export default function Profile() {
                 </span>
                 <span className="text-[11px] text-gray-400 font-semibold">
                   Boshqarish →
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenReportHistory}
+                className="w-full py-2 px-3 rounded-xl bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs flex items-center justify-between transition-colors shadow-2xs"
+              >
+                <span className="flex items-center gap-2">
+                  <Shield size={15} className="text-amber-500" />
+                  <span>Mening shikoyatlarim (Report History)</span>
+                </span>
+                <span className="text-[11px] text-gray-400 font-semibold">
+                  Ko'rish →
                 </span>
               </button>
             </div>
@@ -580,8 +850,114 @@ export default function Profile() {
         />
       )}
 
+      {/* Dating Preferences Modal */}
+      {showPreferencesModal && (
+        <DatingPreferencesModal
+          currentPreferences={profile?.preferences || {}}
+          onClose={() => setShowPreferencesModal(false)}
+          onSave={handleSavePreferences}
+        />
+      )}
+
+      {/* Verification Modal */}
+      {showVerificationModal && (
+        <VerificationModal
+          profile={profile}
+          user={user}
+          onClose={() => setShowVerificationModal(false)}
+          onSuccess={() => {
+            refreshProfile();
+          }}
+        />
+      )}
+
+      {/* User Report History Modal */}
+      {showReportHistoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 select-none">
+          <div className="w-full max-w-md bg-white rounded-3xl p-5 shadow-card border border-gray-100 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Shield size={16} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-gray-900">
+                    Mening Shikoyatlarim
+                  </h3>
+                  <p className="text-[10px] text-gray-400">
+                    Siz yuborgan shikoyatlar tarixi
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReportHistoryModal(false)}
+                className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto thin-scroll flex-1 space-y-2">
+              {loadingReports ? (
+                <div className="p-8 text-center text-xs text-gray-400">
+                  Yuklanmoqda...
+                </div>
+              ) : reportHistory.length === 0 ? (
+                <div className="p-8 text-center text-xs text-gray-400">
+                  Siz hozircha hech qanday shikoyat yubormagansiz.
+                </div>
+              ) : (
+                reportHistory.map((rep) => (
+                  <div
+                    key={rep.id}
+                    className="p-3 rounded-2xl bg-gray-50 border border-gray-100 space-y-1 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-800">
+                        {rep.reportedUserName || "Foydalanuvchi"}
+                      </span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          rep.status === "resolved"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : rep.status === "dismissed"
+                            ? "bg-gray-200 text-gray-600"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {rep.status === "resolved"
+                          ? "Hal qilindi"
+                          : rep.status === "dismissed"
+                          ? "Yopildi"
+                          : "Ko'rib chiqilmoqda"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Sabab: <span className="font-semibold text-gray-700">{rep.reason}</span>
+                    </p>
+                    {rep.description && (
+                      <p className="text-[11px] text-gray-600 italic">
+                        "{rep.description}"
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowReportHistoryModal(false)}
+              className="w-full py-2.5 rounded-full border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50"
+            >
+              Yopish
+            </button>
+          </div>
+        </div>
+      )}
+
       <p className="text-center text-xs text-gray-400 mt-5 leading-relaxed px-4">
-        AnjurXdating — O'zbekiston bo'ylab samimiy tanishuvlar va suhbatlar platformasi.
+        O'zbekiston uchun rasmiy tanishuv dasturi.
       </p>
     </div>
   );

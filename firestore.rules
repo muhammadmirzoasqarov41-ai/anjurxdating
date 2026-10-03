@@ -23,6 +23,24 @@ service cloud.firestore {
       return isSuperAdmin() || isAppointedAdmin();
     }
 
+    function isVerificationAdmin() {
+      return isSuperAdmin() || (
+        isAppointedAdmin() && (
+          get(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())).data.roles.hasAny(['verification_manager']) ||
+          get(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())).data.permissions.hasAny(['verification:approve', 'verification:reject', '*'])
+        )
+      );
+    }
+
+    function isUsernameAdmin() {
+      return isSuperAdmin() || (
+        isAppointedAdmin() && (
+          get(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())).data.roles.hasAny(['username_manager']) ||
+          get(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())).data.permissions.hasAny(['usernames:view', 'usernames:approve', 'usernames:reject', 'usernames:reserve', 'usernames:assign', '*'])
+        )
+      );
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -46,9 +64,15 @@ service cloud.firestore {
     }
 
     // Profiles: users can read profiles for the swipe deck, only owner can edit their own
+    // Normal users CANNOT self-promote to verified = true
     match /tinder_profiles/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner(userId) || isSuperAdmin();
+      allow create: if isOwner(userId) && (!('verified' in request.resource.data) || request.resource.data.verified == false);
+      allow update: if isSuperAdmin() || isVerificationAdmin() || (
+        isOwner(userId) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['verified', 'isVerified', 'verificationApprovedAt']))
+      );
+      allow delete: if isSuperAdmin();
     }
 
     // Swipes: users record their likes and nopes
@@ -116,6 +140,75 @@ service cloud.firestore {
         allow read, update, delete: if isOwner(userId) || isSuperAdmin();
         allow create: if isAuthenticated();
       }
+    }
+
+    // Dating Preferences: users can read and write only their own preferences
+    match /tinder_preferences/{userId} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Verification Requests:
+    // - User can create and read only their own request
+    // - Verification Admin or Super Admin can read and update (approve/reject)
+    match /verificationRequests/{requestId} {
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.uid
+        && request.resource.data.status == "pending";
+      allow read: if (isAuthenticated() && request.auth.uid == resource.data.uid) || isVerificationAdmin();
+      allow update: if isVerificationAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Stage 12: Unique @username System & Registry
+    // - Authenticated users can read usernames to search, resolve, or verify uniqueness
+    // - Normal users can only register their own UID and cannot hijack reserved names
+    // - Super Admin & Username Managers have full moderation authority
+    match /usernames/{normalizedUsername} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && (request.auth.uid == request.resource.data.uid || isUsernameAdmin())
+        && (!exists(/databases/$(database)/documents/reservedUsernames/$(normalizedUsername)) || isUsernameAdmin());
+      allow update: if isUsernameAdmin() || (
+        isAuthenticated() && request.auth.uid == resource.data.uid && request.auth.uid == request.resource.data.uid
+      );
+      allow delete: if isUsernameAdmin() || (
+        isAuthenticated() && request.auth.uid == resource.data.uid
+      );
+    }
+
+    // Reserved usernames: platform, brand, official, system names
+    // Only Super Admin and Username Managers can create, update, or remove
+    match /reservedUsernames/{normalizedUsername} {
+      allow read: if isAuthenticated();
+      allow write: if isUsernameAdmin();
+    }
+
+    // Username requests:
+    // - User can request custom/reserved/brand username
+    // - Only owner can create (with pending status) and cancel
+    // - Only Username Admin / Super Admin can approve or reject
+    match /usernameRequests/{requestId} {
+      allow read: if isUsernameAdmin() || (isAuthenticated() && request.auth.uid == resource.data.uid);
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.uid
+        && request.resource.data.status == "pending";
+      allow update: if isUsernameAdmin() || (
+        isAuthenticated() && request.auth.uid == resource.data.uid && request.resource.data.status == "cancelled"
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // Username history for anti-hijacking and cooldown
+    match /usernameHistory/{normalizedUsername} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() || isUsernameAdmin();
+    }
+
+    // Moderation flags created by safety automation
+    match /moderationFlags/{flagId} {
+      allow read, update: if isAdminOrSuperAdmin();
+      allow create: if isAuthenticated();
+      allow delete: if isSuperAdmin();
     }
 
     // Admin audit logs: admins can read and log actions, only super admin can delete

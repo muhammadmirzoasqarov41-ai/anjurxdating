@@ -1055,6 +1055,18 @@ export const ADMIN_ROLES = [
     permissions: ["profiles:view", "profiles:detail"],
   },
   {
+    id: "verification_manager",
+    label: "Verification Manager",
+    section: "verification",
+    description: "Profilni tasdiqlash so'rovlarini ko'rish, tekshirish, tasdiqlash va rad etish",
+    permissions: [
+      "verification:view",
+      "verification:review",
+      "verification:approve",
+      "verification:reject",
+    ],
+  },
+  {
     id: "reports_manager",
     label: "Reports Manager",
     section: "reports",
@@ -1095,6 +1107,19 @@ export const ADMIN_ROLES = [
     section: "settings",
     description: "Tizim sozlamalari va ma'lumotlarini ko'rish (Admin Management bundan mustasno)",
     permissions: ["settings:view"],
+  },
+  {
+    id: "username_manager",
+    label: "Username Manager",
+    section: "usernames",
+    description: "Noyob @username so'rovlari, band qilingan nomlar va moderatsiyasini boshqarish",
+    permissions: [
+      "usernames:view",
+      "usernames:approve",
+      "usernames:reject",
+      "usernames:reserve",
+      "usernames:assign",
+    ],
   },
 ];
 
@@ -1150,12 +1175,14 @@ export async function getAdminPrivileges(user) {
         "dashboard",
         "users",
         "profiles",
+        "verification",
         "reports",
         "matches",
         "chats",
         "moderation",
         "statistics",
         "settings",
+        "usernames",
       ],
       permissions: ["*"],
     };

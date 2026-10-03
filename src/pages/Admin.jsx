@@ -19,6 +19,7 @@ import {
   Mail,
   CheckCircle2,
   Shield,
+  AtSign,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import {
@@ -40,11 +41,16 @@ import AdminChatsView from "../components/admin/AdminChatsView";
 import AdminModerationView from "../components/admin/AdminModerationView";
 import AdminStatisticsView from "../components/admin/AdminStatisticsView";
 import AdminSettingsView from "../components/admin/AdminSettingsView";
+import AdminVerificationView from "../components/admin/AdminVerificationView";
+import AdminUsernamesView from "../components/admin/AdminUsernamesView";
+import { getAdminVerificationRequests } from "../lib/verification";
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "users", label: "Foydalanuvchilar", icon: Users },
   { id: "profiles", label: "Profillar", icon: UserCheck },
+  { id: "verification", label: "Tasdiqlash", icon: CheckCircle2 },
+  { id: "usernames", label: "Usernamelar", icon: AtSign },
   { id: "reports", label: "Shikoyatlar", icon: Flag },
   { id: "matches", label: "Matchlar", icon: Heart },
   { id: "chats", label: "Suhbatlar", icon: MessageCircle },
@@ -242,6 +248,48 @@ export default function Admin() {
     }
   }, [activeTab, reportsLoaded, loadReports]);
 
+  // VERIFICATION SECTION DATA MANAGEMENT
+  const [verificationList, setVerificationList] = useState([]);
+  const [verificationStats, setVerificationStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationLoaded, setVerificationLoaded] = useState(false);
+  const [verificationError, setVerificationError] = useState(null);
+
+  const loadVerification = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setVerificationLoading(true);
+    setVerificationError(null);
+
+    try {
+      const data = await getAdminVerificationRequests({
+        status: "all",
+        limitCount: 100,
+      });
+      setVerificationList(data.requests || []);
+      setVerificationStats(
+        data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 }
+      );
+      setVerificationLoaded(true);
+    } catch (err) {
+      console.error("Verification so'rovlarini yuklashda xatolik:", err);
+      setVerificationError("Verification so'rovlarini yuklashda xatolik yuz berdi");
+    } finally {
+      setVerificationLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "verification" && !verificationLoaded) {
+      loadVerification();
+    }
+  }, [activeTab, verificationLoaded, loadVerification]);
+
   // MATCHES SECTION DATA MANAGEMENT
   const [matchesList, setMatchesList] = useState([]);
   const [matchesStats, setMatchesStats] = useState({
@@ -433,6 +481,7 @@ export default function Admin() {
                 onClick={() => {
                   if (activeTab === "users") loadUsers(true);
                   else if (activeTab === "profiles") loadProfiles(true);
+                  else if (activeTab === "verification") loadVerification(true);
                   else if (activeTab === "reports") loadReports(true);
                   else if (activeTab === "matches") loadMatches(true);
                   else if (activeTab === "chats") loadChats(true);
@@ -444,6 +493,7 @@ export default function Admin() {
                   refreshing ||
                   usersLoading ||
                   profilesLoading ||
+                  verificationLoading ||
                   reportsLoading ||
                   matchesLoading ||
                   chatsLoading ||
@@ -458,6 +508,7 @@ export default function Admin() {
                     refreshing ||
                     usersLoading ||
                     profilesLoading ||
+                    verificationLoading ||
                     reportsLoading ||
                     matchesLoading ||
                     chatsLoading ||
@@ -847,6 +898,20 @@ export default function Admin() {
           profiles={profilesList}
           loading={profilesLoading}
           onRefresh={() => loadProfiles(true)}
+        />
+      ) : activeTab === "verification" ? (
+        <AdminVerificationView
+          requests={verificationList}
+          stats={verificationStats}
+          loading={verificationLoading}
+          error={verificationError}
+          onRefresh={() => loadVerification(true)}
+          adminPrivileges={adminPrivileges}
+        />
+      ) : activeTab === "usernames" ? (
+        <AdminUsernamesView
+          adminEmail={user?.email}
+          isSuperAdmin={isSuperAdmin}
         />
       ) : activeTab === "reports" ? (
         <AdminReportsView

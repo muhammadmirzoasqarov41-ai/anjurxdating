@@ -61,9 +61,21 @@ export const STANDARD_LANGUAGES = [
   "Qoraqalpoqcha",
 ];
 
+export const DEFAULT_PREFERENCES = {
+  minAge: 18,
+  maxAge: 50,
+  gender: "all", // "all" | "female" | "male"
+  maxDistanceKm: 100, // 5 to 500 km, 0 = unlimited
+  datingIntention: "all", // "all" or specific intention
+  interests: [], // Array of preferred interests
+  languages: [], // Array of preferred languages
+  onlyVerified: false,
+  onlyOnline: false,
+};
+
 /**
  * Calculates a deterministic compatibility score between current user and candidate profile.
- * Incorporates real calculated geographic distance.
+ * Incorporates real calculated geographic distance and dating preferences.
  */
 export function calculateCompatibility(me = {}, target = {}) {
   let score = 55; // Base baseline score
@@ -71,9 +83,16 @@ export function calculateCompatibility(me = {}, target = {}) {
 
   // 1. Mutual Interests (up to +25%)
   const myInterests = Array.isArray(me?.interests) ? me.interests : [];
+  const preferredInterests = Array.isArray(me?.preferences?.interests)
+    ? me.preferences.interests
+    : [];
   const targetInterests = Array.isArray(target?.interests) ? target.interests : [];
 
-  const mutualInterests = myInterests.filter((item) =>
+  const combinedMyInterests = Array.from(
+    new Set([...myInterests, ...preferredInterests])
+  );
+
+  const mutualInterests = combinedMyInterests.filter((item) =>
     targetInterests.some(
       (ti) => ti.trim().toLowerCase() === item.trim().toLowerCase()
     )
@@ -88,7 +107,10 @@ export function calculateCompatibility(me = {}, target = {}) {
   }
 
   // 2. Dating Intention Alignment (up to +15%)
-  const myIntention = me?.datingIntention || me?.preferences?.datingIntention;
+  const myIntention =
+    me?.preferences?.datingIntention && me.preferences.datingIntention !== "all"
+      ? me.preferences.datingIntention
+      : me?.datingIntention;
   const targetIntention = target?.datingIntention;
 
   if (myIntention && targetIntention) {
@@ -139,8 +161,13 @@ export function calculateCompatibility(me = {}, target = {}) {
 
   // 5. Language compatibility (up to +5%)
   const myLangs = Array.isArray(me?.languages) ? me.languages : [];
+  const preferredLangs = Array.isArray(me?.preferences?.languages)
+    ? me.preferences.languages
+    : [];
+  const combinedMyLangs = Array.from(new Set([...myLangs, ...preferredLangs]));
   const targetLangs = Array.isArray(target?.languages) ? target.languages : [];
-  const sharedLangs = myLangs.filter((l) =>
+
+  const sharedLangs = combinedMyLangs.filter((l) =>
     targetLangs.some((tl) => tl.toLowerCase().trim() === l.toLowerCase().trim())
   );
   if (sharedLangs.length > 0) {
@@ -176,21 +203,40 @@ export function calculateCompatibility(me = {}, target = {}) {
  */
 export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
   const result = [];
+  const prefs = me?.preferences || {};
 
-  // Active filter criteria
-  const minAge = filters?.minAge ? Number(filters.minAge) : null;
-  const maxAge = filters?.maxAge ? Number(filters.maxAge) : null;
-  const genderFilter = filters?.gender && filters.gender !== "all" ? filters.gender : null;
+  // Active filter criteria: explicit filters take precedence, otherwise persistent preferences are used
+  const minAge = filters?.minAge !== undefined ? Number(filters.minAge) : (Number(prefs.minAge) || 18);
+  const maxAge = filters?.maxAge !== undefined ? Number(filters.maxAge) : (Number(prefs.maxAge) || 75);
+  const genderFilter =
+    filters?.gender && filters.gender !== "all"
+      ? filters.gender
+      : (prefs?.gender && prefs.gender !== "all" ? prefs.gender : null);
+
   const datingIntentionFilter =
     filters?.datingIntention && filters.datingIntention !== "all"
       ? filters.datingIntention
-      : null;
+      : (prefs?.datingIntention && prefs.datingIntention !== "all" ? prefs.datingIntention : null);
+
   const cityFilter = filters?.city && filters.city !== "all" ? filters.city : null;
-  const maxDistance = filters?.maxDistance ? Number(filters.maxDistance) : null;
+
+  const maxDistance =
+    filters?.maxDistance !== undefined && Number(filters.maxDistance) > 0
+      ? Number(filters.maxDistance)
+      : (Number(prefs.maxDistanceKm) > 0 ? Number(prefs.maxDistanceKm) : null);
+
   const requiredInterest = filters?.interest && filters.interest !== "all" ? filters.interest : null;
+  const preferredInterests = Array.isArray(prefs.interests) ? prefs.interests : [];
+
   const languageFilter = filters?.language && filters.language !== "all" ? filters.language : null;
-  const verifiedOnly = Boolean(filters?.verifiedOnly);
-  const onlineOnly = Boolean(filters?.onlineOnly);
+  const preferredLanguages = Array.isArray(prefs.languages) ? prefs.languages : [];
+
+  const verifiedOnly = Boolean(
+    filters?.verifiedOnly !== undefined ? filters.verifiedOnly : prefs.onlyVerified
+  );
+  const onlineOnly = Boolean(
+    filters?.onlineOnly !== undefined ? filters.onlineOnly : prefs.onlyOnline
+  );
   const newOnly = Boolean(filters?.newOnly);
 
   for (const card of rawCards) {
@@ -198,7 +244,7 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
     const realDistanceKm = calculateProfileDistance(me, card);
     card.realDistanceKm = realDistanceKm;
 
-    // 1. Filter: Age
+    // 1. Filter: Age (Safe boundary check)
     if (card.age) {
       if (minAge && card.age < minAge) continue;
       if (maxAge && card.age > maxAge) continue;
@@ -232,14 +278,13 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
         if (card.realDistanceKm > maxDistance) continue;
       } else {
         // If candidate has no location, but user filtered by distance:
-        // if user has city and card has different city, skip
         if (me?.city && card.city && me.city.toLowerCase() !== card.city.toLowerCase()) {
           continue;
         }
       }
     }
 
-    // 6. Filter: Specific Interest
+    // 6. Filter: Specific Interest (Must match if required)
     if (requiredInterest) {
       const interests = Array.isArray(card.interests) ? card.interests : [];
       const hasInterest = interests.some(
@@ -248,7 +293,7 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
       if (!hasInterest) continue;
     }
 
-    // 7. Filter: Language
+    // 7. Filter: Specific Language
     if (languageFilter) {
       const langs = Array.isArray(card.languages) ? card.languages : [];
       const hasLang = langs.some(
@@ -274,8 +319,30 @@ export function filterAndSortDeck(rawCards = [], me = {}, filters = {}) {
       if (!isRecent) continue;
     }
 
-    // Calculate real compatibility (incorporating real distance)
+    // Calculate real compatibility (incorporating real distance & preferences)
     const compatibility = calculateCompatibility(me, card);
+
+    // Boost compatibility if card shares preferred interests
+    if (preferredInterests.length > 0) {
+      const cardInterests = Array.isArray(card.interests) ? card.interests : [];
+      const hasPrefInterest = preferredInterests.some((pi) =>
+        cardInterests.some((ci) => ci.trim().toLowerCase() === pi.trim().toLowerCase())
+      );
+      if (hasPrefInterest) {
+        compatibility.score = Math.min(99, compatibility.score + 5);
+      }
+    }
+
+    // Boost compatibility if card speaks preferred languages
+    if (preferredLanguages.length > 0) {
+      const cardLangs = Array.isArray(card.languages) ? card.languages : [];
+      const hasPrefLang = preferredLanguages.some((pl) =>
+        cardLangs.some((cl) => cl.trim().toLowerCase() === pl.trim().toLowerCase())
+      );
+      if (hasPrefLang) {
+        compatibility.score = Math.min(99, compatibility.score + 3);
+      }
+    }
 
     result.push({
       ...card,

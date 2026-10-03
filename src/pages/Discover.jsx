@@ -39,6 +39,16 @@ export default function Discover() {
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState(profile?.preferences || {});
 
+  // Keep activeFilters synchronized with persistent profile.preferences
+  useEffect(() => {
+    if (profile?.preferences) {
+      setActiveFilters((prev) => ({
+        ...profile.preferences,
+        ...prev,
+      }));
+    }
+  }, [profile?.preferences]);
+
   // Initialize location store with saved profile settings
   useEffect(() => {
     if (profile) {

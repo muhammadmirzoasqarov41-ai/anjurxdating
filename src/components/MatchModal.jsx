@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Star, MessageCircle } from "lucide-react";
 import { matchIdFor } from "../lib/firestore";
 import { getConversationStarters } from "../lib/conversationStarters";
+import VerifiedBadge from "./VerifiedBadge";
 
 // Classic "It's a Match!" celebration modal with Super Like indicator and Conversation Starters
 export default function MatchModal({ me, target, onClose }) {
@@ -40,9 +41,18 @@ export default function MatchModal({ me, target, onClose }) {
         )}
 
         <h1 className="text-4xl font-extrabold italic mb-1">Bu match!</h1>
-        <p className="text-white/90 mb-6 text-center text-sm">
-          Siz va {target.displayName} bir-biringizga yoqdingiz
+        <p className="text-white/90 mb-1 text-center text-sm flex items-center justify-center gap-1">
+          <span>Siz va {target.displayName}</span>
+          {Boolean(target.verified || target.isVerified) && (
+            <VerifiedBadge size={14} className="text-white fill-white/20" />
+          )}
+          <span>bir-biringizga yoqdingiz</span>
         </p>
+        {target.username && (
+          <p className="text-white/80 font-bold text-xs mb-5">
+            @{target.username}
+          </p>
+        )}
 
         <div className="flex items-center -space-x-4 mb-6">
           <Avatar src={me.photos?.[0]} label={me.displayName} />

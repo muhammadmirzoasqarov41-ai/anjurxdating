@@ -15,10 +15,13 @@ import {
   ShieldAlert,
   UserX,
   MoreVertical,
+  Copy,
+  Share2,
 } from "lucide-react";
 import { formatDistance } from "../lib/location";
 import ReportModal from "./ReportModal";
 import BlockModal from "./BlockModal";
+import VerifiedBadge from "./VerifiedBadge";
 
 export default function ProfileDetailModal({
   profile,
@@ -35,6 +38,30 @@ export default function ProfileDetailModal({
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyUsername = (e) => {
+    e?.stopPropagation();
+    if (!profile?.username) return;
+    navigator.clipboard.writeText(`@${profile.username.replace(/^@/, "")}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShareProfile = (e) => {
+    e?.stopPropagation();
+    const url = `${window.location.origin}/u/${profile.username || profile.uid}`;
+    if (navigator.share) {
+      navigator.share({
+        title: `${profile.displayName} (@${profile.username || ""})`,
+        url,
+      }).catch(() => {});
+      return;
+    }
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (!profile) return null;
 
@@ -174,9 +201,12 @@ export default function ProfileDetailModal({
               {/* Name, Age, Status */}
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-black text-gray-900">
-                    {profile.displayName}
+                  <h2 className="text-2xl font-black text-gray-900 flex items-center gap-1.5 flex-wrap">
+                    <span>{profile.displayName}</span>
                     {profile.age && <span className="font-light">, {profile.age}</span>}
+                    {Boolean(profile.verified || profile.isVerified) && (
+                      <VerifiedBadge size={20} />
+                    )}
                   </h2>
                   {isOnline && (
                     <span
@@ -185,6 +215,35 @@ export default function ProfileDetailModal({
                     />
                   )}
                 </div>
+
+                {profile.username && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-bold text-flame-start bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
+                      @{profile.username}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCopyUsername}
+                      className="p-1 rounded-full text-gray-400 hover:text-gray-600 bg-gray-50 border border-gray-100 transition-colors"
+                      title="Usernameni nusxalash"
+                    >
+                      <Copy size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleShareProfile}
+                      className="p-1 rounded-full text-gray-400 hover:text-gray-600 bg-gray-50 border border-gray-100 transition-colors"
+                      title="Profil havolasini ulashish"
+                    >
+                      <Share2 size={12} />
+                    </button>
+                    {copied && (
+                      <span className="text-[10px] text-emerald-600 font-bold animate-in fade-in">
+                        Nusxalandi!
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Subtitle Info */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 font-medium">

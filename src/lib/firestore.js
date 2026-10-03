@@ -37,6 +37,43 @@ export async function saveProfile(uid, data) {
   );
 }
 
+// Dating Preferences management
+export async function saveUserPreferences(uid, preferences) {
+  if (!uid || !preferences) return;
+  await Promise.all([
+    setDoc(
+      doc(db, "tinder_profiles", uid),
+      {
+        preferences,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    ),
+    setDoc(
+      doc(db, "tinder_preferences", uid),
+      {
+        uid,
+        ...preferences,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    ),
+  ]);
+}
+
+export async function getUserPreferences(uid) {
+  if (!uid) return null;
+  try {
+    const snap = await getDoc(doc(db, "tinder_preferences", uid));
+    if (snap.exists()) {
+      return snap.data();
+    }
+  } catch (err) {
+    console.warn("getUserPreferences error:", err);
+  }
+  return null;
+}
+
 // User Presence tracking
 export async function updateUserPresence(uid, online = true) {
   if (!uid) return;
@@ -68,8 +105,12 @@ export async function getBlockedIds(uid) {
 }
 
 export async function blockUser(uid, target) {
+  if (!uid || !target) return;
   const targetUid = typeof target === "string" ? target : target.uid;
   const targetProfile = typeof target === "object" ? target : {};
+
+  // Prevent self-block
+  if (uid === targetUid) return;
 
   await setDoc(doc(db, "tinder_blocks", uid, "blocked", targetUid), {
     blockedUid: targetUid,
@@ -147,6 +188,31 @@ export async function createReport({
   description = "",
   source = "profile",
 }) {
+  if (!reporterUid || !reportedUid || reporterUid === reportedUid) {
+    throw new Error("Shikoyat qilish parametrlarida xatolik");
+  }
+
+  // 1. Prevent duplicate report from same reporter within 24h
+  try {
+    const existingQ = query(
+      collection(db, "reports"),
+      where("reporterUid", "==", reporterUid),
+      where("reportedUid", "==", reportedUid),
+      where("status", "==", "pending")
+    );
+    const existingSnap = await getDocs(existingQ);
+    if (!existingSnap.empty) {
+      throw new Error(
+        "Siz bu profil bo'yicha allaqachon shikoyat yuborgansiz. Moderatsiya uni ko'rib chiqmoqda."
+      );
+    }
+  } catch (err) {
+    if (err.message && err.message.includes("allaqachon shikoyat")) {
+      throw err;
+    }
+  }
+
+  // 2. Add report document
   const docRef = await addDoc(collection(db, "reports"), {
     reporterUid,
     reporterId: reporterUid,
@@ -160,7 +226,54 @@ export async function createReport({
     status: "pending",
     createdAt: serverTimestamp(),
   });
+
+  // 3. Safety Automation: Check report count for reportedUid
+  try {
+    const countQ = query(
+      collection(db, "reports"),
+      where("reportedUid", "==", reportedUid)
+    );
+    const countSnap = await getDocs(countQ);
+    const totalReports = countSnap.size;
+
+    // If 3 or more reports accumulated, trigger a moderation flag signal (without banning user)
+    if (totalReports >= 3) {
+      await setDoc(
+        doc(db, "moderationFlags", `flag_${reportedUid}`),
+        {
+          uid: reportedUid,
+          reportedUserName: reportedName || "Foydalanuvchi",
+          reportCount: totalReports,
+          reason: `Ko'p sonli shikoyatlar (${totalReports} ta)`,
+          status: "flagged",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  } catch (flagErr) {
+    console.warn("Safety flag check warning:", flagErr);
+  }
+
   return docRef.id;
+}
+
+export async function getUserReportHistory(uid) {
+  if (!uid) return [];
+  try {
+    const q = query(
+      collection(db, "reports"),
+      where("reporterUid", "==", uid),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn("getUserReportHistory warning:", err);
+    return [];
+  }
 }
 
 // Privacy Settings

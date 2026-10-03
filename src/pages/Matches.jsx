@@ -4,6 +4,7 @@ import { useAuthStore } from "../store/authStore";
 import { useChatStore } from "../store/chatStore";
 import { formatMessageTime } from "../lib/firestore";
 import EmptyState from "../components/EmptyState";
+import VerifiedBadge from "../components/VerifiedBadge";
 
 export default function Matches() {
   const { user } = useAuthStore();
@@ -104,6 +105,14 @@ export default function Matches() {
                     >
                       {other.displayName}
                     </p>
+                    {Boolean(other.verified || other.isVerified) && (
+                      <VerifiedBadge size={13} />
+                    )}
+                    {other.username && (
+                      <span className="text-[11px] font-semibold text-rose-500 shrink-0">
+                        @{other.username}
+                      </span>
+                    )}
                     {m.isSuperLike && (
                       <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-sky-50 text-superlike font-bold border border-sky-100 shrink-0">
                         Super

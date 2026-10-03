@@ -176,19 +176,26 @@ export default function SwipeCard({
         {/* Bottom gradient overlay & profile details */}
         <div className="absolute bottom-0 left-0 right-0 p-5 pt-16 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white pointer-events-none z-10">
           <div className="flex items-center justify-between">
-            <div className="flex items-end gap-2 min-w-0">
-              <h2 className="text-2xl font-bold truncate">{profile.displayName}</h2>
-              {profile.age && <span className="text-xl font-medium">{profile.age}</span>}
-              {(profile.verified || profile.isVerified) && (
-                <span title="Tasdiqlangan profil" className="text-blue-400 mb-0.5 shrink-0">
-                  <ShieldCheck size={18} />
-                </span>
-              )}
-              {isOnline && (
-                <span
-                  title="Hozir onlayn"
-                  className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white/60 mb-1.5 shrink-0"
-                />
+            <div className="min-w-0">
+              <div className="flex items-end gap-2 min-w-0">
+                <h2 className="text-2xl font-bold truncate">{profile.displayName}</h2>
+                {profile.age && <span className="text-xl font-medium">{profile.age}</span>}
+                {(profile.verified || profile.isVerified) && (
+                  <span title="Tasdiqlangan profil" className="text-blue-400 mb-0.5 shrink-0">
+                    <ShieldCheck size={18} />
+                  </span>
+                )}
+                {isOnline && (
+                  <span
+                    title="Hozir onlayn"
+                    className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white/60 mb-1.5 shrink-0"
+                  />
+                )}
+              </div>
+              {profile.username && (
+                <p className="text-xs font-semibold text-rose-200 drop-shadow-xs">
+                  @{profile.username}
+                </p>
               )}
             </div>
 

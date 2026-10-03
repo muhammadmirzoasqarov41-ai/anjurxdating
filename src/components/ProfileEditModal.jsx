@@ -17,6 +17,11 @@ import {
   Sliders,
   ChevronRight,
   Flame,
+  AtSign,
+  RefreshCw,
+  Send,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import {
   STANDARD_INTERESTS,
@@ -30,9 +35,16 @@ import {
   uploadProfilePhotos,
   MAX_PHOTO_COUNT,
 } from "../lib/storage";
+import {
+  checkUsernameAvailability,
+  claimUsername,
+  createUsernameRequest,
+  validateUsernameFormat,
+} from "../lib/username";
 
 const TABS = [
   { id: "photos", label: "Rasmlar" },
+  { id: "username", label: "@Username" },
   { id: "basic", label: "Asosiy" },
   { id: "bio", label: "Haqida" },
   { id: "interests", label: "Qiziqishlar" },
@@ -83,6 +95,57 @@ export default function ProfileEditModal({
   );
 
   const fileInputRef = useRef(null);
+
+  // Stage 12: Unique @username state
+  const [usernameInput, setUsernameInput] = useState(profile?.username || "");
+  const [usernameStatus, setUsernameStatus] = useState(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [requestReason, setRequestReason] = useState("");
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
+
+  // Debounced availability check
+  useEffect(() => {
+    const trimmed = usernameInput.replace(/^@/, "").trim();
+    if (!trimmed) {
+      setUsernameStatus(null);
+      setCheckingUsername(false);
+      return;
+    }
+
+    setCheckingUsername(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUsernameAvailability(trimmed, userId);
+        setUsernameStatus(res);
+      } catch (err) {
+        console.warn("Username availability error:", err);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 320);
+
+    return () => clearTimeout(timer);
+  }, [usernameInput, userId]);
+
+  const handleSendUsernameRequest = async () => {
+    const clean = usernameInput.replace(/^@/, "").trim();
+    if (!clean) return;
+    setSubmittingRequest(true);
+    try {
+      await createUsernameRequest(userId, profile, clean, requestReason);
+      setRequestSubmitted(true);
+      setShowRequestForm(false);
+      setSuccessMsg("Username so'rovi ma'murlarga muvaffaqiyatli yuborildi!");
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err) {
+      setErrorMsg(err.message || "So'rov yuborishda xatolik yuz berdi");
+      setTimeout(() => setErrorMsg(""), 4000);
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
 
   // Photo handlers
   const handlePhotoUpload = async (e) => {
@@ -193,6 +256,31 @@ export default function ProfileEditModal({
 
     setSaving(true);
     try {
+      let finalUsername = profile?.username || null;
+      let finalNormalized = profile?.normalizedUsername || null;
+
+      const cleanInput = usernameInput.replace(/^@/, "").trim();
+      if (cleanInput && cleanInput !== (profile?.username || "")) {
+        const val = validateUsernameFormat(cleanInput);
+        if (!val.isValid) {
+          setErrorMsg(val.error);
+          setActiveTab("username");
+          setSaving(false);
+          return;
+        }
+
+        try {
+          const claimRes = await claimUsername(userId, cleanInput);
+          finalUsername = claimRes.username;
+          finalNormalized = claimRes.normalizedUsername;
+        } catch (claimErr) {
+          setErrorMsg(claimErr.message || "Usernameni saqlab bo'lmadi");
+          setActiveTab("username");
+          setSaving(false);
+          return;
+        }
+      }
+
       const updatedData = {
         displayName: trimmedName,
         photos,
@@ -203,6 +291,8 @@ export default function ProfileEditModal({
         datingIntention,
         interests,
         languages,
+        username: finalUsername,
+        normalizedUsername: finalNormalized,
         privacy: {
           ...(profile?.privacy || {}),
           isPublic,
@@ -397,6 +487,178 @@ export default function ProfileEditModal({
                   <span>Yangi rasm tanlash (Galereyadan)</span>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* TAB: USERNAME */}
+          {activeTab === "username" && (
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-extrabold text-sm text-gray-900 mb-0.5 flex items-center gap-1.5">
+                  <AtSign className="text-flame-start" size={17} />
+                  <span>Noyob @Username Identifikatori</span>
+                </h4>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Do'stlaringiz va boshqa foydalanuvchilar sizni qidiruvdan topishlari hamda profil havolangizni ulashishingiz uchun ishlatiladi.
+                </p>
+              </div>
+
+              {/* Input field with @ */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Username tanlang
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 text-gray-400 font-extrabold text-base">
+                    @
+                  </span>
+                  <input
+                    type="text"
+                    value={usernameInput.replace(/^@/, "")}
+                    onChange={(e) => {
+                      const clean = e.target.value.toLowerCase().replace(/[^a-zA-Z0-9_]/g, "");
+                      setUsernameInput(clean);
+                    }}
+                    placeholder="masalan: azizbek_01"
+                    maxLength={20}
+                    className="w-full pl-8 pr-10 py-2.5 rounded-2xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-900 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono"
+                  />
+                  <div className="absolute right-3 top-2.5 flex items-center">
+                    {checkingUsername && (
+                      <RefreshCw size={16} className="text-gray-400 animate-spin" />
+                    )}
+                    {!checkingUsername && usernameStatus?.status === "available" && (
+                      <CheckCircle2 size={18} className="text-emerald-500" />
+                    )}
+                    {!checkingUsername && usernameStatus?.status === "current" && (
+                      <Check size={18} className="text-sky-500" />
+                    )}
+                    {!checkingUsername &&
+                      (usernameStatus?.status === "taken" ||
+                        usernameStatus?.status === "reserved" ||
+                        usernameStatus?.status === "invalid" ||
+                        usernameStatus?.status === "cooldown") && (
+                        <AlertCircle size={18} className="text-rose-500" />
+                      )}
+                  </div>
+                </div>
+
+                {/* Status Indicator */}
+                {usernameStatus && (
+                  <div className="mt-2 text-xs">
+                    {usernameStatus.status === "available" && (
+                      <p className="text-emerald-700 font-bold flex items-center gap-1.5">
+                        <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                        <span>@{usernameStatus.cleanUsername} mavjud va foydalanish mumkin! ✓</span>
+                      </p>
+                    )}
+                    {usernameStatus.status === "current" && (
+                      <p className="text-sky-700 font-bold flex items-center gap-1.5">
+                        <Check size={14} className="text-sky-600 shrink-0" />
+                        <span>Bu sizning hozirgi faol usernamingiz.</span>
+                      </p>
+                    )}
+                    {usernameStatus.status === "taken" && (
+                      <p className="text-rose-600 font-semibold flex items-center gap-1.5">
+                        <AlertCircle size={14} className="shrink-0" />
+                        <span>Bu username band. Iltimos, boshqa nom tanlang.</span>
+                      </p>
+                    )}
+                    {usernameStatus.status === "reserved" && (
+                      <div className="space-y-2">
+                        <p className="text-rose-600 font-semibold flex items-center gap-1.5">
+                          <AlertCircle size={14} className="shrink-0" />
+                          <span>Bu username foydalanish uchun mavjud emas.</span>
+                        </p>
+                        {!showRequestForm && !requestSubmitted && (
+                          <button
+                            type="button"
+                            onClick={() => setShowRequestForm(true)}
+                            className="text-xs font-bold text-flame-start hover:underline flex items-center gap-1"
+                          >
+                            <span>Ushbu nom uchun ma'muriyatga so'rov yubormoqchimisiz?</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {usernameStatus.status === "cooldown" && (
+                      <p className="text-amber-700 font-semibold flex items-center gap-1.5">
+                        <Clock size={14} className="shrink-0" />
+                        <span>{usernameStatus.message}</span>
+                      </p>
+                    )}
+                    {usernameStatus.status === "invalid" && (
+                      <p className="text-rose-600 font-medium flex items-center gap-1.5">
+                        <AlertCircle size={14} className="shrink-0" />
+                        <span>{usernameStatus.message}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Reserved Request Form */}
+              {showRequestForm && !requestSubmitted && (
+                <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-xs space-y-2.5 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                      <Shield size={14} />
+                      <span>Rasmiy Username So'rovi</span>
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => setShowRequestForm(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <p className="text-amber-800 text-[11px] leading-relaxed">
+                    Agar siz ushbu brend, tashkilot yoki rasmiy shaxs vakili bo'lsangiz, sababini ko'rsatgan holda so'rov yuboring. Ma'murlar ko'rib chiqib sizga biriktiradi.
+                  </p>
+                  <textarea
+                    value={requestReason}
+                    onChange={(e) => setRequestReason(e.target.value)}
+                    placeholder="Masalan: Men ushbu rasmiy brend/tashkilot asoschisiman..."
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-amber-200 text-xs text-gray-800 focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendUsernameRequest}
+                    disabled={submittingRequest || !requestReason.trim()}
+                    className="w-full py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50"
+                  >
+                    {submittingRequest ? (
+                      <RefreshCw size={13} className="animate-spin" />
+                    ) : (
+                      <Send size={13} />
+                    )}
+                    <span>So'rovni Yuborish</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Request Success message */}
+              {requestSubmitted && (
+                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-600" />
+                  <span>So'rovingiz qabul qilindi va ko'rib chiqilmoqda!</span>
+                </div>
+              )}
+
+              {/* Guidelines Card */}
+              <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-100 text-xs text-gray-600 space-y-1.5">
+                <span className="font-bold text-gray-800 block mb-1">
+                  Username qoidalari:
+                </span>
+                <ul className="text-[11px] space-y-1 list-disc list-inside text-gray-500">
+                  <li>3 dan 20 gacha belgidan iborat bo'lishi kerak</li>
+                  <li>Faqat lotin harflari (a-z), raqamlar (0-9) va pastki chiziq (_)</li>
+                  <li>Katta va kichik harflar bir xil hisoblanadi (@Ali = @ali)</li>
+                  <li>Har bir username butun platformada yagona va takrorlanmas</li>
+                </ul>
+              </div>
             </div>
           )}
 

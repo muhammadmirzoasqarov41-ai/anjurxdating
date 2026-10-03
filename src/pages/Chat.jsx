@@ -9,6 +9,8 @@ import {
   ShieldAlert,
   UserX,
   HeartOff,
+  Copy,
+  Share2,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useChatStore } from "../store/chatStore";
@@ -29,6 +31,7 @@ import ChatBubble from "../components/ChatBubble";
 import ReportModal from "../components/ReportModal";
 import BlockModal from "../components/BlockModal";
 import UnmatchModal from "../components/UnmatchModal";
+import VerifiedBadge from "../components/VerifiedBadge";
 
 export default function Chat() {
   const { matchId } = useParams();
@@ -279,10 +282,18 @@ export default function Chat() {
 
           {/* Name & Online Status */}
           <div className="min-w-0 leading-tight">
-            <h2 className="font-bold text-sm text-gray-900 truncate">
-              {other.displayName}
+            <h2 className="font-bold text-sm text-gray-900 truncate flex items-center gap-1">
+              <span className="truncate">{other.displayName}</span>
+              {Boolean(otherProfile?.verified || otherProfile?.isVerified) && (
+                <VerifiedBadge size={14} />
+              )}
             </h2>
-            <p className="text-[11px] text-gray-400 flex items-center gap-1">
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              {otherProfile?.username && (
+                <span className="text-flame-start font-semibold">
+                  @{otherProfile.username}
+                </span>
+              )}
               {isOnline ? (
                 <span className="text-emerald-600 font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -293,7 +304,7 @@ export default function Chat() {
               ) : (
                 "Oflayn"
               )}
-            </p>
+            </div>
           </div>
         </div>
 
@@ -309,13 +320,37 @@ export default function Chat() {
 
           {showMenu && (
             <div className="absolute right-0 top-10 w-48 bg-white rounded-2xl shadow-card border border-gray-100 py-1.5 z-40 text-xs">
+              {otherProfile?.username && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+                    navigator.clipboard.writeText(`@${otherProfile.username}`);
+                  }}
+                  className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-semibold transition-colors"
+                >
+                  <Copy size={14} className="text-gray-400" />
+                  <span>Usernameni nusxalash</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  navigate(`/u/${otherProfile?.username || otherUid}`);
+                }}
+                className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-semibold transition-colors border-t border-gray-100"
+              >
+                <Share2 size={14} className="text-gray-400" />
+                <span>Profil sahifasini ko'rish</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setShowMenu(false);
                   setShowUnmatchModal(true);
                 }}
-                className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-semibold transition-colors"
+                className="w-full px-3.5 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-semibold border-t border-gray-100 transition-colors"
               >
                 <HeartOff size={14} className="text-amber-500" />
                 <span>Matchni bekor qilish</span>

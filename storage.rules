@@ -1,0 +1,46 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated()
+        && (request.auth.token.email.matches('(?i)^luxaidevs@gmail\\.com$') || request.auth.token.email == "luxaidevs@gmail.com")
+        && request.auth.token.email_verified == true;
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Public Profile Photos: authenticated users can read, owner can upload/delete
+    match /profile_photos/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && isValidImage();
+      allow delete: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Private Verification Photos:
+    // Strictly confidential: Only the owner can upload, only the owner and Super Admin can read/delete
+    // Never publicly accessible
+    match /verification_photos/{userId}/{fileName} {
+      allow create: if isOwner(userId) && isValidImage();
+      allow read: if isOwner(userId) || isSuperAdmin();
+      allow update: if false; // immutable verification evidence
+      allow delete: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Default fallback
+    match /{allPaths=**} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}

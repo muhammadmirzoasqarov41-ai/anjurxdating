@@ -136,10 +136,8 @@ export default function Login() {
           </p>
         </div>
 
-        <p className="text-center text-xs text-white/80 mt-5 leading-relaxed px-2">
-          Bu dasturlashni mashq qilish uchun yaratilgan shaxsiy loyiha. U Tinder
-          yoki Match Group bilan aloqador emas, bog'liq emas va ular tomonidan
-          qo'llab-quvvatlanmaydi.
+        <p className="text-center text-xs text-white/80 mt-5 leading-relaxed px-2 font-medium">
+          AnjurXdating — O'zbekiston uchun rasmiy tanishuv dasturi.
         </p>
       </motion.div>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Flame, MessageCircle, User, Shield, Star, Bell } from "lucide-react";
+import { Flame, MessageCircle, User, Shield, Star, Bell, Search } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useChatStore } from "../store/chatStore";
 import { useNotificationStore } from "../store/notificationStore";
@@ -44,6 +44,9 @@ export default function TopNav() {
           <nav className="flex items-center gap-0.5 sm:gap-1">
             <NavLink to="/" end className={link} title="Kashf qilish" aria-label="Kashf qilish">
               <Flame size={18} />
+            </NavLink>
+            <NavLink to="/search" className={link} title="Qidiruv (@username)" aria-label="Qidiruv">
+              <Search size={18} />
             </NavLink>
             <NavLink to="/favorites" className={link} title="Saqlanganlar" aria-label="Saqlanganlar">
               <Star size={18} />
